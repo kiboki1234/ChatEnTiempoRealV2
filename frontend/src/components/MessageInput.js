@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { FaSmile, FaPaperPlane, FaTimes } from 'react-icons/fa';
 import socket from '../services/socketService';
-import '../styles/sendMessages.css';
+import '../App.css';
 
 const stickers = [
     '😀', '😂', '😍', '😎', '😭', '😡', '👍', '👎', '🙏', '👏', // Emojis existentes
@@ -10,6 +11,7 @@ const stickers = [
 const MessageInput = ({ username, replyTo, setReplyTo }) => {
     const [input, setInput] = useState('');
     const [showStickers, setShowStickers] = useState(false);
+    const stickerRef = useRef(null);
 
     // Función para agregar stickers al input
     const addStickerToInput = (sticker) => {
@@ -39,24 +41,43 @@ const MessageInput = ({ username, replyTo, setReplyTo }) => {
         }
     };
 
+    // Cerrar stickers al hacer clic fuera o al presionar el botón nuevamente
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (stickerRef.current && !stickerRef.current.contains(event.target) && event.target.className !== 'sticker-button') {
+                setShowStickers(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+    // Cancelar intento de responder
+    const cancelReply = () => {
+        setReplyTo(null);
+    };
+
     return (
         <div className="message-input">
             {replyTo && (
                 <div className="reply-preview">
                     Responder a: <strong>{replyTo.username}</strong> - "{replyTo.message}"
+                    <button className="cancel-reply-button" onClick={cancelReply}><FaTimes /></button>
                 </div>
             )}
+            <button className="sticker-button" onClick={() => setShowStickers((prev) => !prev)}><FaSmile /></button>
             <input
                 className="input-box"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyPress}
             />
-            <button className="send-button" onClick={sendMessage}>Enviar</button>
-            <button className="sticker-button" onClick={() => setShowStickers(!showStickers)}>😀</button>
+            <button className="send-button" onClick={sendMessage}><FaPaperPlane /></button>
 
             {showStickers && (
-                <div className="sticker-container">
+                <div className="sticker-container" ref={stickerRef}>
                     <div className="sticker-list">
                         {stickers.map((sticker, index) => (
                             <button

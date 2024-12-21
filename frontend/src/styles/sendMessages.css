@@ -10,7 +10,7 @@
 
 /* Botón para abrir la lista de stickers */
 .sticker-button {
-    margin-left: 10px;
+    margin-right: 10px; /* Cambia el margen al lado derecho para moverlo al lado izquierdo */
     padding: 8px 12px;
     font-size: 20px;
     cursor: pointer;
@@ -28,7 +28,7 @@
 .sticker-container {
     position: absolute;
     bottom: 50px; /* Despliega sobre el botón */
-    right: 0; /* Alineado con el botón */
+    left: 0; /* Cambiado a la izquierda */
     width: 300px;
     background: #fff;
     border: 1px solid #ccc;
@@ -108,17 +108,4 @@
 
 .reply-button:hover {
     background-color: #e0e0e0;
-}
-/* Estilo para stickers de imagen */
-.sticker-image {
-    width: 40px;
-    height: 40px;
-    border-radius: 5px;
-    object-fit: cover; /* Ajuste para que las imágenes mantengan proporciones */
-    cursor: pointer;
-    transition: transform 0.2s ease, background-color 0.2s ease;
-}
-
-.sticker-image:hover {
-    transform: scale(1.2); /* Animación al pasar el cursor */
 }

@@ -1,7 +1,9 @@
-
 body {
     font-family: Arial, sans-serif;
     background-color: #f0f8ff;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
 .chat-container {
@@ -88,4 +90,156 @@ body {
     margin-left: 10px;
     padding: 5px 10px;
     cursor: pointer;
+}
+
+/* Media queries for responsive design */
+@media (max-width: 768px) {
+    .chat-container {
+        max-width: 90%;
+        margin: 10px auto;
+    }
+
+    .message-list {
+        height: 200px;
+        padding: 5px;
+    }
+
+    .input-box {
+        padding: 8px;
+    }
+
+    .send-button {
+        padding: 8px 16px;
+    }
+
+    .message-item {
+        max-width: 80%;
+    }
+}
+
+@media (max-width: 480px) {
+    .chat-container {
+        max-width: 100%;
+        margin: 5px;
+        padding: 5px;
+    }
+
+    .message-list {
+        height: 150px;
+        padding: 5px;
+    }
+
+    .input-box {
+        padding: 6px;
+    }
+
+    .send-button {
+        padding: 6px 12px;
+    }
+
+    .message-item {
+        max-width: 90%;
+    }
+}
+
+/* Stickers and buttons */
+.message-input {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border-top: 1px solid #ccc;
+    background-color: #fff;
+    position: relative;
+}
+
+.sticker-button {
+    padding: 8px 12px;
+    font-size: 20px;
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    background-color: #f0f0f0;
+    transition: background-color 0.3s ease;
+}
+
+.sticker-button:hover {
+    background-color: #e0e0e0;
+}
+
+.sticker-container {
+    position: absolute;
+    bottom: 50px;
+    left: 0;
+    width: 300px;
+    background: #fff;
+    border: 1px solid #ccc;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    padding: 10px;
+    z-index: 1000;
+}
+
+.sticker-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.sticker-item {
+    font-size: 24px;
+    padding: 8px;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.sticker-item:hover {
+    transform: scale(1.2);
+    background-color: #f0f0f0;
+}
+
+.sticker {
+    font-size: 28px;
+}
+
+.sent {
+    align-self: flex-end;
+    background-color: #dcf8c6;
+    text-align: right;
+    padding: 10px;
+    margin: 5px;
+    border-radius: 8px;
+    max-width: 60%;
+}
+
+.received {
+    align-self: flex-start;
+    background-color: #f1f0f0;
+    text-align: left;
+    padding: 10px;
+    margin: 5px;
+    border-radius: 8px;
+    max-width: 60%;
+}
+
+.reply-preview {
+    font-size: 0.8em;
+    color: gray;
+    margin-bottom: 5px;
+}
+
+.reply-button {
+    margin-left: 10px;
+    padding: 5px 10px;
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    background-color: #f0f0f0;
+}
+
+.reply-button:hover {
+    background-color: #e0e0e0;
 }

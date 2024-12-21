@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { FaReply } from 'react-icons/fa';
 import '../styles/sendMessages.css';
 
 const MessageList = ({ messages, onReply, username }) => {
@@ -28,7 +29,9 @@ const MessageList = ({ messages, onReply, username }) => {
                             msg.message
                         )}
                     </div>
-                    <button onClick={() => onReply(msg._id)} className="reply-button">Responder</button>
+                    <button onClick={() => onReply(msg._id)} className="reply-button">
+                        <FaReply />
+                    </button>
                 </div>
             ))}
             <div ref={messageEndRef}></div>
