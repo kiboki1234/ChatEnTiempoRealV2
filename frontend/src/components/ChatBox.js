@@ -9,6 +9,7 @@ const ChatBox = () => {
     const [username, setUsername] = useState('');
     const [replyTo, setReplyTo] = useState(null);
 
+    // Generar nombre de usuario único
     const generateUsername = () => {
         const storedUsername = localStorage.getItem('username');
         if (storedUsername) {
@@ -20,6 +21,7 @@ const ChatBox = () => {
         }
     };
 
+    // Cargar mensajes iniciales y escuchar nuevos mensajes
     useEffect(() => {
         const currentUsername = generateUsername();
         setUsername(currentUsername);
@@ -35,15 +37,20 @@ const ChatBox = () => {
         return () => socket.off('receiveMessage');
     }, []);
 
+    // Seleccionar mensaje para responder
     const handleReply = (messageId) => {
         const message = messages.find(msg => msg._id === messageId);
         setReplyTo(message);
     };
 
+    // Inicializar anuncios de AdSense
     useEffect(() => {
-        if (window.adsbygoogle) {
-            window.adsbygoogle.push({});
-        }
+        const loadAds = () => {
+            if (window.adsbygoogle && typeof window.adsbygoogle.push === "function") {
+                window.adsbygoogle.push({});
+            }
+        };
+        loadAds();
     }, []);
 
     return (
@@ -57,7 +64,8 @@ const ChatBox = () => {
                     style={{ display: "block" }}
                     data-ad-client="ca-pub-5502091173009531"
                     data-ad-slot="1234567890"
-                    data-ad-format="auto"></ins>
+                    data-ad-format="auto"
+                    data-full-width-responsive="true"></ins>
             </div>
 
             <MessageList messages={messages} onReply={handleReply} username={username} />

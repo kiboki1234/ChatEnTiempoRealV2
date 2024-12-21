@@ -243,3 +243,31 @@ body {
 .reply-button:hover {
     background-color: #e0e0e0;
 }
+
+/* Bloque para anuncios */
+.ad-container {
+    margin: 10px 0; /* Espaciado superior e inferior */
+    padding: 10px; /* Espaciado interno */
+    text-align: center; /* Centrar contenido */
+    border: 1px solid #e0e0e0; /* Borde suave */
+    border-radius: 8px; /* Bordes redondeados */
+    background: #f9f9f9; /* Color de fondo */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Sombra ligera */
+}
+
+/* Responsividad para los anuncios */
+@media (max-width: 768px) {
+    .ad-container {
+        margin: 5px 0; /* Reduce el margen */
+        padding: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .ad-container {
+        margin: 5px 0; /* Espaciado más pequeño */
+        padding: 5px;
+        font-size: 14px; /* Texto más pequeño */
+    }
+}
+
