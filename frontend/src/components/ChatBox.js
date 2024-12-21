@@ -14,14 +14,14 @@ const ChatBox = () => {
 
     // Estado para manejar el modo oscuro
     const [darkMode, setDarkMode] = useState(() => {
-        return localStorage.getItem('darkMode') === 'true'; // Cargar configuración guardada
+        return localStorage.getItem('darkMode') === 'true';
     });
 
     // Alternar el modo oscuro
     const toggleDarkMode = () => {
         const newMode = !darkMode;
         setDarkMode(newMode);
-        localStorage.setItem('darkMode', newMode); // Guardar preferencia
+        localStorage.setItem('darkMode', newMode);
     };
 
     // Aplicar clase al body según el modo
@@ -45,6 +45,37 @@ const ChatBox = () => {
         }
     };
 
+    // Función para solicitar permisos de notificación
+    const requestNotificationPermission = async () => {
+        if ('Notification' in window && 'serviceWorker' in navigator) {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                console.log('Permiso concedido para notificaciones');
+            } else {
+                console.log('Permiso denegado para notificaciones');
+            }
+        } else {
+            console.log('El navegador no soporta notificaciones push.');
+        }
+    };
+
+    // Enviar una notificación push con sonido
+    const sendNotification = (message) => {
+        if (Notification.permission === 'granted') {
+            navigator.serviceWorker.getRegistration().then(registration => {
+                // Mostrar la notificación
+                registration.showNotification('Nuevo mensaje recibido', {
+                    body: `${message.username}: ${message.message || message.sticker}`,
+                    icon: '/favicon.ico', // Asegúrate de tener este ícono en la carpeta public
+                });
+
+                // Reproducir sonido
+                const audio = new Audio('/notification.mp3'); // Asegúrate de tener el archivo en public/
+                audio.play();
+            });
+        }
+    };
+
     // Cargar mensajes iniciales
     useEffect(() => {
         const currentUsername = generateUsername();
@@ -56,16 +87,26 @@ const ChatBox = () => {
 
         socket.on('receiveMessage', (message) => {
             setMessages((prev) => [...prev, message]);
+            
+            // Notificar si el mensaje no es del usuario actual
+            if (message.username !== username) {
+                sendNotification(message);
+            }
         });
 
         return () => socket.off('receiveMessage');
-    }, []);
+    }, [username]);
 
     // Seleccionar mensaje para responder
     const handleReply = (messageId) => {
         const message = messages.find(msg => msg._id === messageId);
         setReplyTo(message);
     };
+
+    // Solicitar permiso para notificaciones al cargar el componente
+    useEffect(() => {
+        requestNotificationPermission();
+    }, []);
 
     return (
         <div className="page-container">
