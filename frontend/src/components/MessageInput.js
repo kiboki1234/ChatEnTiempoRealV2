@@ -16,7 +16,7 @@ const MessageInput = ({ username, replyTo, setReplyTo }) => {
         setShowEmojiPicker(false); // Ocultar el selector
     };
 
-    // Función para enviar el mensaje
+    // Función para enviar el mensaje con fecha y hora
     const sendMessage = () => {
         if (input.trim() === '') return; // Evitar enviar mensajes vacíos
 
@@ -24,7 +24,8 @@ const MessageInput = ({ username, replyTo, setReplyTo }) => {
             username,
             message: input, // Enviar el contenido del input
             sticker: '', // Campo vacío porque solo es texto
-            replyTo: replyTo?._id || null
+            replyTo: replyTo?._id || null,
+            timestamp: new Date().toISOString(), // Añadir marca de tiempo
         };
         socket.emit('sendMessage', newMessage);
         setInput('');

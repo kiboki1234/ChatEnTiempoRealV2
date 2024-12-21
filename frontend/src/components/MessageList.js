@@ -8,12 +8,31 @@ const MessageList = ({ messages, onReply, username }) => {
     const messageEndRef = useRef(null);
     const [previews, setPreviews] = useState({}); // Almacena las previsualizaciones
 
+    // Función para formatear fecha
+    const formatDate = (timestamp) => {
+        const date = new Date(timestamp);
+        return date.toLocaleDateString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: '2-digit',
+        });
+    };
+
+    // Función para formatear hora
+    const formatTime = (timestamp) => {
+        const date = new Date(timestamp);
+        return date.toLocaleTimeString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    };
+
     // Desplazar automáticamente al último mensaje
     useEffect(() => {
         messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    // Obtener previsualización de los enlaces usando OpenGraph.io
+    // Obtener previsualización de enlaces
     useEffect(() => {
         const fetchPreviews = async () => {
             const newPreviews = {};
@@ -23,10 +42,10 @@ const MessageList = ({ messages, onReply, username }) => {
                 const urls = msg.message.match(urlRegex);
                 if (urls) {
                     for (const url of urls) {
-                        if (!previews[url]) { // Si no está en caché
+                        if (!previews[url]) {
                             try {
                                 const response = await axios.get(
-                                    `https://opengraph.io/api/1.1/site/${encodeURIComponent(url)}?app_id=465a9207-8b19-4775-b59c-e7ff8e34124a`
+                                    `https://opengraph.io/api/1.1/site/${encodeURIComponent(url)}?app_id=YOUR_APP_ID`
                                 );
 
                                 const ogData = response.data.hybridGraph;
@@ -43,13 +62,13 @@ const MessageList = ({ messages, onReply, username }) => {
                     }
                 }
             }
-            setPreviews(prev => ({ ...prev, ...newPreviews })); // Actualizar estado
+            setPreviews((prev) => ({ ...prev, ...newPreviews }));
         };
 
         fetchPreviews();
     }, [messages]);
 
-    // Renderizar el contenido del mensaje
+    // Renderizar contenido del mensaje
     const renderMessageContent = (msg) => {
         const urlRegex = /(https?:\/\/[^\s]+)/g;
         const urls = msg.message.match(urlRegex);
@@ -57,11 +76,10 @@ const MessageList = ({ messages, onReply, username }) => {
         if (urls) {
             return (
                 <div>
-                    <Linkify>{msg.message}</Linkify> {/* Convierte texto en enlaces */}
+                    <Linkify>{msg.message}</Linkify>
                     {urls.map((url, index) => (
                         previews[url] ? (
                             <div key={index} className="link-preview-container">
-                                {/* Renderiza la previsualización */}
                                 {previews[url].image && (
                                     <img
                                         src={previews[url].image}
@@ -81,12 +99,7 @@ const MessageList = ({ messages, onReply, username }) => {
                                 </a>
                             </div>
                         ) : (
-                            <a
-                                key={index}
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                            >
+                            <a key={index} href={url} target="_blank" rel="noopener noreferrer">
                                 {url}
                             </a>
                         )
@@ -94,8 +107,7 @@ const MessageList = ({ messages, onReply, username }) => {
                 </div>
             );
         }
-
-        return msg.message; // Devuelve el mensaje si no hay enlaces
+        return msg.message;
     };
 
     return (
@@ -105,19 +117,19 @@ const MessageList = ({ messages, onReply, username }) => {
                     key={index}
                     className={`message-item ${msg.username === username ? 'sent' : 'received'}`}
                 >
-                    {msg.replyTo && (
-                        <div className="reply-preview">
-                            <strong>{msg.replyTo.username}</strong>: "{msg.replyTo.message}"
-                        </div>
-                    )}
+                    {index === 0 || formatDate(messages[index - 1].timestamp) !== formatDate(msg.timestamp) ? (
+                        <div className="message-date">{formatDate(msg.timestamp)}</div>
+                    ) : null}
+
+                    <div className="message-username">{msg.username}</div>
                     <div className="message-content">
-                        <strong>{msg.username}: </strong>
                         {msg.sticker ? (
                             <span className="sticker">{msg.sticker}</span>
                         ) : (
-                            renderMessageContent(msg) // Renderiza mensaje con previsualización
+                            renderMessageContent(msg)
                         )}
                     </div>
+                    <div className="message-time">{formatTime(msg.timestamp)}</div>
                     <button onClick={() => onReply(msg._id)} className="reply-button">
                         <FaReply />
                     </button>
