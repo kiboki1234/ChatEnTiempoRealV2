@@ -60,6 +60,7 @@ body {
     display: flex;
     gap: 10px;
     margin-top: 10px;
+    position: relative;
 }
 
 .input-box {
@@ -187,4 +188,18 @@ body.dark-mode .ad-container {
     border-color: #555;
 }
 
+/* Selector de emojis */
+.emoji-picker-container {
+    position: absolute;
+    bottom: 50px;
+    left: 10px;
+    z-index: 10;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    background: white;
+    border-radius: 8px;
+}
 
+body.dark-mode .emoji-picker-container {
+    background: #333333;
+    color: #e0e0e0;
+}
