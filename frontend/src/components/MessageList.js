@@ -2,12 +2,11 @@ import React, { useEffect, useRef } from 'react';
 import '../styles/sendMessages.css';
 
 const MessageList = ({ messages, onReply, username }) => {
-    const messageEndRef = useRef(null); // Referencia al final de la lista de mensajes
+    const messageEndRef = useRef(null);
 
-    // Desplazar hacia el último mensaje
     useEffect(() => {
-        messageEndRef.current?.scrollIntoView({ behavior: 'smooth' }); // Hace el scroll suave
-    }, [messages]); // Se ejecuta cada vez que cambia la lista de mensajes
+        messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
 
     return (
         <div className="message-list">
@@ -22,12 +21,16 @@ const MessageList = ({ messages, onReply, username }) => {
                         </div>
                     )}
                     <div className="message-content">
-                        <strong>{msg.username}: </strong>{msg.message}
+                        <strong>{msg.username}: </strong>
+                        {msg.sticker ? (
+                            <span className="sticker">{msg.sticker}</span>
+                        ) : (
+                            msg.message
+                        )}
                     </div>
                     <button onClick={() => onReply(msg._id)} className="reply-button">Responder</button>
                 </div>
             ))}
-            {/* Elemento invisible al final para desplazar el scroll */}
             <div ref={messageEndRef}></div>
         </div>
     );

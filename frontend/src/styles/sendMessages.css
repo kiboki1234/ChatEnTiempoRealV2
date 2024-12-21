@@ -1,43 +1,124 @@
-.message-list {
-    padding: 10px;
+/* Estilo general para el input de mensajes */
+.message-input {
     display: flex;
-    flex-direction: column;
-}
-
-.message-item {
+    align-items: center;
     padding: 10px;
-    margin: 5px;
-    border-radius: 8px;
-    max-width: 60%;
-    display: inline-block;
+    border-top: 1px solid #ccc;
+    background-color: #fff;
+    position: relative; /* Para posicionar elementos relativos al input */
 }
 
+/* Botón para abrir la lista de stickers */
+.sticker-button {
+    margin-left: 10px;
+    padding: 8px 12px;
+    font-size: 20px;
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    background-color: #f0f0f0;
+    transition: background-color 0.3s ease;
+}
+
+.sticker-button:hover {
+    background-color: #e0e0e0;
+}
+
+/* Contenedor para los stickers/emotes */
+.sticker-container {
+    position: absolute;
+    bottom: 50px; /* Despliega sobre el botón */
+    right: 0; /* Alineado con el botón */
+    width: 300px;
+    background: #fff;
+    border: 1px solid #ccc;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    padding: 10px;
+    z-index: 1000; /* Asegura que esté por encima de otros elementos */
+}
+
+/* Lista de stickers */
+.sticker-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* Botones de cada sticker */
+.sticker-item {
+    font-size: 24px;
+    padding: 8px;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.sticker-item:hover {
+    transform: scale(1.2);
+    background-color: #f0f0f0;
+}
+
+/* Mensajes en el chat */
+.sticker {
+    font-size: 28px;
+}
+
+/* Mensajes enviados */
 .sent {
     align-self: flex-end;
     background-color: #dcf8c6;
     text-align: right;
+    padding: 10px;
+    margin: 5px;
+    border-radius: 8px;
+    max-width: 60%;
 }
 
+/* Mensajes recibidos */
 .received {
     align-self: flex-start;
     background-color: #f1f0f0;
     text-align: left;
+    padding: 10px;
+    margin: 5px;
+    border-radius: 8px;
+    max-width: 60%;
 }
 
+/* Respuestas previas */
 .reply-preview {
     font-size: 0.8em;
     color: gray;
     margin-bottom: 5px;
 }
 
-.message-content {
-    word-wrap: break-word;
-}
-
+/* Botón de responder */
 .reply-button {
     margin-left: 10px;
     padding: 5px 10px;
     cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    background-color: #f0f0f0;
 }
 
+.reply-button:hover {
+    background-color: #e0e0e0;
+}
+/* Estilo para stickers de imagen */
+.sticker-image {
+    width: 40px;
+    height: 40px;
+    border-radius: 5px;
+    object-fit: cover; /* Ajuste para que las imágenes mantengan proporciones */
+    cursor: pointer;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
 
+.sticker-image:hover {
+    transform: scale(1.2); /* Animación al pasar el cursor */
+}
