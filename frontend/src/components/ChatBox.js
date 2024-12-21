@@ -24,7 +24,7 @@ const ChatBox = () => {
         const currentUsername = generateUsername();
         setUsername(currentUsername);
 
-        fetch('http://localhost:5000/api/chat')
+        fetch('https://chatentiemporealv2.onrender.com/api/chat')
             .then(response => response.json())
             .then(data => setMessages(data));
 
