@@ -4,6 +4,9 @@ import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import '../App.css';
 
+// Bandera para habilitar anuncios (cambiar a true cuando tengas acceso)
+const ADS_ENABLED = false;
+
 const ChatBox = () => {
     const [messages, setMessages] = useState([]);
     const [username, setUsername] = useState('');
@@ -43,33 +46,62 @@ const ChatBox = () => {
         setReplyTo(message);
     };
 
-    // Inicializar anuncios de AdSense
+    // Inicializar anuncios solo si están habilitados
     useEffect(() => {
-        const loadAds = () => {
-            if (window.adsbygoogle && typeof window.adsbygoogle.push === "function") {
-                window.adsbygoogle.push({});
-            }
-        };
-        loadAds();
+        if (ADS_ENABLED) {
+            const loadAds = () => {
+                const ads = document.querySelectorAll('.adsbygoogle');
+                ads.forEach(ad => {
+                    if (!ad.getAttribute('data-ad-status')) {
+                        (window.adsbygoogle = window.adsbygoogle || []).push({});
+                    }
+                });
+            };
+
+            // Carga los anuncios después de un pequeño retraso
+            const timeout = setTimeout(() => {
+                loadAds();
+            }, 300);
+
+            return () => clearTimeout(timeout);
+        }
     }, []);
 
     return (
-        <div className="chat-container">
-            <h1 className="chat-header">Whispers</h1>
-            <h2 className="chat-username">Usuario: {username}</h2>
+        <div className="page-container">
+            <div className="content-container">
+                {/* Anuncio izquierdo */}
+                {ADS_ENABLED && (
+                    <div className="ad-container ad-left">
+                        <ins className="adsbygoogle"
+                            style={{ display: "block" }}
+                            data-ad-client="ca-pub-5502091173009531"
+                            data-ad-slot="1234567890"
+                            data-ad-format="auto"
+                            data-full-width-responsive="true"></ins>
+                    </div>
+                )}
 
-            {/* Bloque de anuncio */}
-            <div className="ad-container">
-                <ins className="adsbygoogle"
-                    style={{ display: "block" }}
-                    data-ad-client="ca-pub-5502091173009531"
-                    data-ad-slot="1234567890"
-                    data-ad-format="auto"
-                    data-full-width-responsive="true"></ins>
+                {/* Chat principal */}
+                <div className="chat-container">
+                    <h1 className="chat-header">Whispers</h1>
+                    <h2 className="chat-username">Usuario: {username}</h2>
+                    <MessageList messages={messages} onReply={handleReply} username={username} />
+                    <MessageInput username={username} replyTo={replyTo} setReplyTo={setReplyTo} />
+                </div>
+
+                {/* Anuncio derecho */}
+                {ADS_ENABLED && (
+                    <div className="ad-container ad-right">
+                        <ins className="adsbygoogle"
+                            style={{ display: "block" }}
+                            data-ad-client="ca-pub-5502091173009531"
+                            data-ad-slot="0987654321"
+                            data-ad-format="auto"
+                            data-full-width-responsive="true"></ins>
+                    </div>
+                )}
             </div>
-
-            <MessageList messages={messages} onReply={handleReply} username={username} />
-            <MessageInput username={username} replyTo={replyTo} setReplyTo={setReplyTo} />
         </div>
     );
 };

@@ -5,7 +5,6 @@ body {
     padding: 0;
     box-sizing: border-box;
 }
-
 .chat-container {
     max-width: 600px;
     margin: 20px auto;
@@ -244,30 +243,79 @@ body {
     background-color: #e0e0e0;
 }
 
-/* Bloque para anuncios */
-.ad-container {
-    margin: 10px 0; /* Espaciado superior e inferior */
-    padding: 10px; /* Espaciado interno */
-    text-align: center; /* Centrar contenido */
-    border: 1px solid #e0e0e0; /* Borde suave */
-    border-radius: 8px; /* Bordes redondeados */
-    background: #f9f9f9; /* Color de fondo */
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Sombra ligera */
+
+/* Contenedor principal */
+.page-container {
+    display: flex;
+    flex-direction: column; /* Contenido alineado en columna */
+    align-items: center;
+    padding: 10px;
 }
 
-/* Responsividad para los anuncios */
-@media (max-width: 768px) {
+/* Contenedor del contenido principal */
+.content-container {
+    display: flex;
+    flex-direction: row; /* Distribuye en fila */
+    justify-content: space-between; /* Distribuye anuncios y chat */
+    width: 100%;
+    max-width: 1200px;
+}
+
+/* Anuncios laterales */
+.ad-container {
+    width: 160px;
+    height: 600px; /* Anuncio vertical */
+    text-align: center;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #f9f9f9;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    min-width: 160px; /* Evitar colapsos */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Contenedor del chat */
+.chat-container {
+    flex-grow: 1;
+    max-width: 600px;
+    padding: 10px;
+    border: 2px solid #4caf50;
+    border-radius: 10px;
+    background: #ffffff;
+}
+
+/* Responsividad para pantallas medianas */
+@media (max-width: 1024px) {
+    .content-container {
+        flex-direction: column; /* Cambia a columna para pantallas medianas */
+        align-items: center;
+    }
+
     .ad-container {
-        margin: 5px 0; /* Reduce el margen */
-        padding: 8px;
+        width: 100%; /* Anuncios ocupan el ancho completo */
+        height: auto;
+        margin: 10px 0;
     }
 }
 
+/* Responsividad para dispositivos móviles */
+@media (max-width: 768px) {
+    .content-container {
+        flex-direction: column; /* Apila el contenido verticalmente */
+    }
+
+    .ad-container {
+        width: 100%; /* Anuncios ocupan todo el ancho */
+        height: auto;
+        margin: 10px 0; /* Margen entre anuncios */
+    }
+}
+
+/* Ocultar anuncios en pantallas muy pequeñas */
 @media (max-width: 480px) {
     .ad-container {
-        margin: 5px 0; /* Espaciado más pequeño */
-        padding: 5px;
-        font-size: 14px; /* Texto más pequeño */
+        display: none; /* Ocultar anuncios */
     }
 }
-
