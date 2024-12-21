@@ -4,7 +4,7 @@ import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import '../App.css';
 
-// Bandera para habilitar anuncios (cambiar a true cuando tengas acceso)
+// Bandera para habilitar anuncios
 const ADS_ENABLED = false;
 
 const ChatBox = () => {
@@ -12,7 +12,28 @@ const ChatBox = () => {
     const [username, setUsername] = useState('');
     const [replyTo, setReplyTo] = useState(null);
 
-    // Generar nombre de usuario único
+    // Estado para manejar el modo oscuro
+    const [darkMode, setDarkMode] = useState(() => {
+        return localStorage.getItem('darkMode') === 'true'; // Cargar configuración guardada
+    });
+
+    // Alternar el modo oscuro
+    const toggleDarkMode = () => {
+        const newMode = !darkMode;
+        setDarkMode(newMode);
+        localStorage.setItem('darkMode', newMode); // Guardar preferencia
+    };
+
+    // Aplicar clase al body según el modo
+    useEffect(() => {
+        if (darkMode) {
+            document.body.classList.add('dark-mode');
+        } else {
+            document.body.classList.remove('dark-mode');
+        }
+    }, [darkMode]);
+
+    // Generar nombre de usuario
     const generateUsername = () => {
         const storedUsername = localStorage.getItem('username');
         if (storedUsername) {
@@ -24,7 +45,7 @@ const ChatBox = () => {
         }
     };
 
-    // Cargar mensajes iniciales y escuchar nuevos mensajes
+    // Cargar mensajes iniciales
     useEffect(() => {
         const currentUsername = generateUsername();
         setUsername(currentUsername);
@@ -46,27 +67,6 @@ const ChatBox = () => {
         setReplyTo(message);
     };
 
-    // Inicializar anuncios solo si están habilitados
-    useEffect(() => {
-        if (ADS_ENABLED) {
-            const loadAds = () => {
-                const ads = document.querySelectorAll('.adsbygoogle');
-                ads.forEach(ad => {
-                    if (!ad.getAttribute('data-ad-status')) {
-                        (window.adsbygoogle = window.adsbygoogle || []).push({});
-                    }
-                });
-            };
-
-            // Carga los anuncios después de un pequeño retraso
-            const timeout = setTimeout(() => {
-                loadAds();
-            }, 300);
-
-            return () => clearTimeout(timeout);
-        }
-    }, []);
-
     return (
         <div className="page-container">
             <div className="content-container">
@@ -86,6 +86,9 @@ const ChatBox = () => {
                 <div className="chat-container">
                     <h1 className="chat-header">Whispers</h1>
                     <h2 className="chat-username">Usuario: {username}</h2>
+                    <button className="dark-mode-toggle" onClick={toggleDarkMode}>
+                        {darkMode ? '☀️ Modo Claro' : '🌙 Modo Oscuro'}
+                    </button>
                     <MessageList messages={messages} onReply={handleReply} username={username} />
                     <MessageInput username={username} replyTo={replyTo} setReplyTo={setReplyTo} />
                 </div>

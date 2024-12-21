@@ -319,3 +319,104 @@ body {
         display: none; /* Ocultar anuncios */
     }
 }
+
+/* Tema oscuro */
+body.dark-mode {
+    background-color: #121212;
+    color: #e0e0e0;
+}
+
+body.dark-mode .chat-container {
+    background: #1e1e1e;
+    border-color: #90caf9;
+}
+
+/* Botón de modo oscuro */
+.dark-mode-toggle {
+    margin: 10px 0;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    background-color: #4caf50;
+    color: white;
+    font-size: 14px;
+}
+
+.dark-mode-toggle:hover {
+    background-color: #45a049;
+}
+
+/* Mensajes */
+.message-item {
+    padding: 10px;
+    margin: 5px;
+    border-radius: 8px;
+    max-width: 60%;
+    display: inline-block;
+}
+
+.sent {
+    align-self: flex-end;
+    background-color: #dcf8c6;
+    text-align: right;
+}
+
+.received {
+    align-self: flex-start;
+    background-color: #f1f0f0;
+    text-align: left;
+}
+
+/* Modo oscuro para mensajes */
+body.dark-mode .sent {
+    background-color: #1e5622;
+}
+
+body.dark-mode .received {
+    background-color: #333333;
+}
+
+/* Input y botones */
+.message-input {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border-top: 1px solid #ccc;
+    background-color: #fff;
+    position: relative;
+}
+
+body.dark-mode .message-input {
+    background-color: #1e1e1e;
+    border-color: #444;
+}
+
+/* Media queries para adaptabilidad */
+@media (max-width: 768px) {
+    .chat-container {
+        max-width: 90%;
+    }
+}
+
+@media (max-width: 480px) {
+    .chat-container {
+        max-width: 100%;
+        margin: 5px;
+    }
+}
+
+/* Anuncios */
+.ad-container {
+    width: 160px;
+    height: 600px;
+    text-align: center;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #f9f9f9;
+}
+
+body.dark-mode .ad-container {
+    background: #333333;
+    border-color: #555;
+}
