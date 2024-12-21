@@ -1,35 +1,23 @@
-.sticker-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-    margin-top: 10px;
+/* Selector de emojis */
+.emoji-picker-container {
+    position: absolute;
+    bottom: 50px;
+    left: 0;
+    z-index: 1000;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-.sticker-button {
-    padding: 10px;
-    font-size: 1.5em;
+/* Botón de emojis */
+.emoji-button {
+    padding: 8px 12px;
+    font-size: 20px;
     cursor: pointer;
     border: none;
-    background: none;
-    transition: transform 0.2s;
+    border-radius: 5px;
+    background-color: #f0f0f0;
+    transition: background-color 0.3s ease;
 }
 
-.sticker-button:hover {
-    transform: scale(1.2);
-}
-
-.sticker {
-    font-size: 2em;
-}
-
-.message-item.sent .sticker {
-    background-color: #dcf8c6;
-    padding: 10px;
-    border-radius: 8px;
-}
-
-.message-item.received .sticker {
-    background-color: #f1f0f0;
-    padding: 10px;
-    border-radius: 8px;
+.emoji-button:hover {
+    background-color: #e0e0e0;
 }

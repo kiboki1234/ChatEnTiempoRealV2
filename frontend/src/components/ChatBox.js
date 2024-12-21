@@ -40,10 +40,26 @@ const ChatBox = () => {
         setReplyTo(message);
     };
 
+    useEffect(() => {
+        if (window.adsbygoogle) {
+            window.adsbygoogle.push({});
+        }
+    }, []);
+
     return (
         <div className="chat-container">
             <h1 className="chat-header">Whispers</h1>
             <h2 className="chat-username">Usuario: {username}</h2>
+
+            {/* Bloque de anuncio */}
+            <div className="ad-container">
+                <ins className="adsbygoogle"
+                    style={{ display: "block" }}
+                    data-ad-client="ca-pub-5502091173009531"
+                    data-ad-slot="1234567890"
+                    data-ad-format="auto"></ins>
+            </div>
+
             <MessageList messages={messages} onReply={handleReply} username={username} />
             <MessageInput username={username} replyTo={replyTo} setReplyTo={setReplyTo} />
         </div>
