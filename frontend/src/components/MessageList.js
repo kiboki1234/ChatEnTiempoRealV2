@@ -113,27 +113,33 @@ const MessageList = ({ messages, onReply, username }) => {
     return (
         <div className="message-list">
             {messages.map((msg, index) => (
-                <div
-                    key={index}
-                    className={`message-item ${msg.username === username ? 'sent' : 'received'}`}
-                >
-                    {index === 0 || formatDate(messages[index - 1].timestamp) !== formatDate(msg.timestamp) ? (
-                        <div className="message-date">{formatDate(msg.timestamp)}</div>
-                    ) : null}
+                <div className={`message-item ${msg.username === username ? 'sent' : 'received'}`}>
+    {index === 0 || formatDate(messages[index - 1].timestamp) !== formatDate(msg.timestamp) ? (
+        <div className="message-date">{formatDate(msg.timestamp)}</div>
+    ) : null}
 
-                    <div className="message-username">{msg.username}</div>
-                    <div className="message-content">
-                        {msg.sticker ? (
-                            <span className="sticker">{msg.sticker}</span>
-                        ) : (
-                            renderMessageContent(msg)
-                        )}
-                    </div>
-                    <div className="message-time">{formatTime(msg.timestamp)}</div>
-                    <button onClick={() => onReply(msg._id)} className="reply-button">
-                        <FaReply />
-                    </button>
-                </div>
+    <div className="message-username">
+        {msg.replyTo ? (
+            <span>
+                {msg.username} respondió a {msg.replyTo.username} - "{msg.replyTo.message}"
+            </span>
+        ) : (
+            msg.username
+        )}
+    </div>
+    <div className="message-content">
+        {msg.sticker ? (
+            <span className="sticker">{msg.sticker}</span>
+        ) : (
+            renderMessageContent(msg)
+        )}
+    </div>
+    <div className="message-time">{formatTime(msg.timestamp)}</div>
+    <button onClick={() => onReply(msg._id)} className="reply-button">
+        <FaReply />
+    </button>
+</div>
+
             ))}
             <div ref={messageEndRef}></div>
         </div>

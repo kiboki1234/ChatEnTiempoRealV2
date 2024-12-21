@@ -18,19 +18,23 @@ const MessageInput = ({ username, replyTo, setReplyTo }) => {
 
     // Función para enviar el mensaje con fecha y hora
     const sendMessage = () => {
-        if (input.trim() === '') return; // Evitar enviar mensajes vacíos
-
+        if (input.trim() === '') return;
+    
         const newMessage = {
             username,
-            message: input, // Enviar el contenido del input
-            sticker: '', // Campo vacío porque solo es texto
-            replyTo: replyTo?._id || null,
-            timestamp: new Date().toISOString(), // Añadir marca de tiempo
+            message: input,
+            sticker: '',
+            replyTo: replyTo
+                ? { _id: replyTo._id, username: replyTo.username, message: replyTo.message }
+                : null,
+            timestamp: new Date().toISOString(),
         };
+    
         socket.emit('sendMessage', newMessage);
         setInput('');
-        setReplyTo(null); // Limpiar la respuesta seleccionada
+        setReplyTo(null);
     };
+    
 
     // Manejar tecla Enter
     const handleKeyPress = (e) => {
