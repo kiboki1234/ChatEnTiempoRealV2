@@ -38,7 +38,7 @@ const App = () => {
                     <CountdownTimer />
                     <ChatBox />
                     <div style={{ padding: '10px', marginTop: '20px', textAlign: 'center', backgroundColor: '#f0f8ff', border: '1px solid #ccc', borderRadius: '8px' }}>
-                        <p style={{ fontSize: '14px', color: '#555' }}>🛠️ Próxima actualización: Soporte para imágenes</p>
+                        <p style={{ fontSize: '14px', color: '#555' }}>🛠️ Próxima actualización: Soporte para audio</p>
                     </div>
                 </>
             ) : (
