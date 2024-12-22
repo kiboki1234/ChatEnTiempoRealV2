@@ -11,13 +11,19 @@ const getMessages = async (req, res) => {
 
 const createMessage = async (data) => {
     try {
-        const message = new Message(data);
+        const message = new Message({
+            username: data.username,
+            message: data.message,
+            imageUrl: data.imageUrl || null, // URL de la imagen si existe
+            replyTo: data.replyTo || null
+        });
         await message.save();
         return await message.populate('replyTo');
     } catch (error) {
         console.error('Error al guardar el mensaje:', error);
     }
 };
+
 
 module.exports = {
     getMessages,

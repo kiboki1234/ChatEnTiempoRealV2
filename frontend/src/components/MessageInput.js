@@ -1,49 +1,67 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaSmile, FaPaperPlane, FaTimes } from 'react-icons/fa';
+import axios from 'axios';
+import { FaSmile, FaPaperPlane, FaTimes, FaImage } from 'react-icons/fa';
 import EmojiPicker from 'emoji-picker-react';
 import socket from '../services/socketService';
 import '../App.css';
-import '../styles/stickers.css';
 
 const MessageInput = ({ username, replyTo, setReplyTo }) => {
     const [input, setInput] = useState('');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [image, setImage] = useState(null);
     const emojiPickerRef = useRef(null);
 
-    // Función para agregar emoji al input
     const addEmojiToInput = (emojiObject) => {
         setInput((prev) => prev + emojiObject.emoji);
-        setShowEmojiPicker(false); // Ocultar el selector
+        setShowEmojiPicker(false);
     };
 
-    // Función para enviar el mensaje con fecha y hora
-    const sendMessage = () => {
-        if (input.trim() === '') return;
-    
+    const sendMessage = async () => {
+        if (!input.trim() && !image) return;
+        let imageUrl = null;
+
+        if (image) {
+            const formData = new FormData();
+            formData.append('image', image);
+            try {
+                const response = await axios.post(
+                    'https://chatentiemporealv2.onrender.com/api/chat/upload',
+                    formData
+                );
+                imageUrl = response.data.imageUrl;
+            } catch (error) {
+                console.error('Error al subir imagen:', error);
+                return;
+            }
+        }
+
         const newMessage = {
             username,
             message: input,
+            imageUrl,
             sticker: '',
-            replyTo: replyTo
-                ? { _id: replyTo._id, username: replyTo.username, message: replyTo.message }
-                : null,
+            replyTo: replyTo ? { _id: replyTo._id, username: replyTo.username, message: replyTo.message } : null,
             timestamp: new Date().toISOString(),
         };
-    
+
         socket.emit('sendMessage', newMessage);
         setInput('');
+        setImage(null);
         setReplyTo(null);
     };
-    
 
-    // Manejar tecla Enter
     const handleKeyPress = (e) => {
-        if (e.key === 'Enter') {
-            sendMessage();
-        }
+        if (e.key === 'Enter') sendMessage();
     };
 
-    // Cerrar el selector de emojis si se hace clic fuera
+    const handleImageChange = (e) => {
+        setImage(e.target.files[0]);
+    };
+
+    const cancelReply = () => {
+        setReplyTo(null);
+    };
+
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (
@@ -58,45 +76,31 @@ const MessageInput = ({ username, replyTo, setReplyTo }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Cancelar intento de responder
-    const cancelReply = () => {
-        setReplyTo(null);
-    };
-
     return (
         <div className="message-input">
             {replyTo && (
                 <div className="reply-preview">
-                    Responder a: <strong>{replyTo.username}</strong> - "{replyTo.message}"
+                    Respondiendo a: {replyTo.username} - "{replyTo.message}"
                     <button className="cancel-reply-button" onClick={cancelReply}>
                         <FaTimes />
                     </button>
                 </div>
             )}
-            {/* Botón para abrir el selector de emojis */}
-            <button
-                className="emoji-button"
-                onClick={() => setShowEmojiPicker((prev) => !prev)}
-            >
+            <button className="emoji-button" onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
                 <FaSmile />
             </button>
-
-            {/* Selector de emojis */}
             {showEmojiPicker && (
                 <div ref={emojiPickerRef} className="emoji-picker-container">
                     <EmojiPicker onEmojiClick={addEmojiToInput} />
                 </div>
             )}
-
-            {/* Input para texto */}
             <input
                 className="input-box"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyPress}
             />
-
-            {/* Botón para enviar */}
+            <input type="file" accept="image/*" onChange={handleImageChange} />
             <button className="send-button" onClick={sendMessage}>
                 <FaPaperPlane />
             </button>

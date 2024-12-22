@@ -1,8 +1,9 @@
 const express = require('express');
 const multer = require('multer');
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const { v2: cloudinary } = require('cloudinary');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const router = express.Router();
+require('dotenv').config();
 
 // Configurar Cloudinary
 cloudinary.config({
@@ -11,7 +12,7 @@ cloudinary.config({
     api_secret: 'wTSH-fbfFyufhklaNJcGxn-gmfc'
 });
 
-// Configurar almacenamiento en Cloudinary
+// Configurar el almacenamiento en Cloudinary
 const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
@@ -22,16 +23,14 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage });
 
-// Endpoint para cargar imágenes
+// Endpoint para subir imágenes
 router.post('/upload', upload.single('image'), (req, res) => {
     if (!req.file) {
-        return res.status(400).json({ error: 'No se ha subido ninguna imagen.' });
+        return res.status(400).send('No se ha subido ninguna imagen.');
     }
-    res.status(200).json({ imageUrl: req.file.path });
-});
 
-// Endpoint para obtener mensajes
-const { getMessages } = require('../controllers/chatController');
-router.get('/', getMessages);
+    const imageUrl = req.file.path; // URL pública en Cloudinary
+    res.json({ imageUrl });
+});
 
 module.exports = router;

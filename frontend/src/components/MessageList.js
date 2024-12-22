@@ -73,73 +73,71 @@ const MessageList = ({ messages, onReply, username }) => {
         const urlRegex = /(https?:\/\/[^\s]+)/g;
         const urls = msg.message.match(urlRegex);
 
-        if (urls) {
-            return (
-                <div>
-                    <Linkify>{msg.message}</Linkify>
-                    {urls.map((url, index) => (
-                        previews[url] ? (
-                            <div key={index} className="link-preview-container">
-                                {previews[url].image && (
-                                    <img
-                                        src={previews[url].image}
-                                        alt="Preview"
-                                        className="link-preview-image"
-                                    />
-                                )}
-                                <h3 className="link-preview-title">{previews[url].title}</h3>
-                                <p className="link-preview-description">{previews[url].description}</p>
-                                <a
-                                    href={previews[url].url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="link-preview-url"
-                                >
-                                    Visitar sitio
+        return (
+            <div>
+                {msg.imageUrl && (
+                    <img src={msg.imageUrl} alt="Imagen" style={{ maxWidth: '200px', borderRadius: '8px' }} />
+                )}
+                {urls ? (
+                    <div>
+                        <Linkify>{msg.message}</Linkify>
+                        {urls.map((url, index) => (
+                            previews[url] ? (
+                                <div key={index} className="link-preview-container">
+                                    {previews[url].image && (
+                                        <img
+                                            src={previews[url].image}
+                                            alt="Preview"
+                                            className="link-preview-image"
+                                        />
+                                    )}
+                                    <h3 className="link-preview-title">{previews[url].title}</h3>
+                                    <p className="link-preview-description">{previews[url].description}</p>
+                                    <a
+                                        href={previews[url].url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="link-preview-url"
+                                    >
+                                        Visitar sitio
+                                    </a>
+                                </div>
+                            ) : (
+                                <a key={index} href={url} target="_blank" rel="noopener noreferrer">
+                                    {url}
                                 </a>
-                            </div>
-                        ) : (
-                            <a key={index} href={url} target="_blank" rel="noopener noreferrer">
-                                {url}
-                            </a>
-                        )
-                    ))}
-                </div>
-            );
-        }
-        return msg.message;
+                            )
+                        ))}
+                    </div>
+                ) : (
+                    msg.message
+                )}
+            </div>
+        );
     };
 
     return (
         <div className="message-list">
             {messages.map((msg, index) => (
-                <div className={`message-item ${msg.username === username ? 'sent' : 'received'}`}>
-    {index === 0 || formatDate(messages[index - 1].timestamp) !== formatDate(msg.timestamp) ? (
-        <div className="message-date">{formatDate(msg.timestamp)}</div>
-    ) : null}
-
-    <div className="message-username">
-        {msg.replyTo ? (
-            <span>
-                {msg.username} respondió a {msg.replyTo.username} - "{msg.replyTo.message}"
-            </span>
-        ) : (
-            msg.username
-        )}
-    </div>
-    <div className="message-content">
-        {msg.sticker ? (
-            <span className="sticker">{msg.sticker}</span>
-        ) : (
-            renderMessageContent(msg)
-        )}
-    </div>
-    <div className="message-time">{formatTime(msg.timestamp)}</div>
-    <button onClick={() => onReply(msg._id)} className="reply-button">
-        <FaReply />
-    </button>
-</div>
-
+                <div key={msg._id} className={`message-item ${msg.username === username ? 'sent' : 'received'}`}>
+                    {index === 0 || formatDate(messages[index - 1].timestamp) !== formatDate(msg.timestamp) ? (
+                        <div className="message-date">{formatDate(msg.timestamp)}</div>
+                    ) : null}
+                    <div className="message-username">
+                        {msg.replyTo ? (
+                            <span>
+                                {msg.username} respondió a {msg.replyTo.username} - "{msg.replyTo.message}"
+                            </span>
+                        ) : (
+                            msg.username
+                        )}
+                    </div>
+                    <div className="message-content">{renderMessageContent(msg)}</div>
+                    <div className="message-time">{formatTime(msg.timestamp)}</div>
+                    <button onClick={() => onReply(msg._id)} className="reply-button">
+                        <FaReply />
+                    </button>
+                </div>
             ))}
             <div ref={messageEndRef}></div>
         </div>
