@@ -100,7 +100,16 @@ const MessageInput = ({ username, replyTo, setReplyTo }) => {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyPress}
             />
-            <input type="file" accept="image/*" onChange={handleImageChange} />
+            <label htmlFor="image-upload" className="image-upload-button">
+                <FaImage />
+            </label>
+            <input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                style={{ display: 'none' }}
+            />
             <button className="send-button" onClick={sendMessage}>
                 <FaPaperPlane />
             </button>
