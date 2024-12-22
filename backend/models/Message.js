@@ -3,7 +3,8 @@ const mongoose = require('mongoose');
 const messageSchema = new mongoose.Schema({
     username: String,
     message: String,
-    sticker: String, // Nuevo campo para stickers/emotes
+    sticker: String,
+    imageUrl: String, // Nuevo campo para imágenes
     timestamp: {
         type: Date,
         default: Date.now,
@@ -14,5 +15,6 @@ const messageSchema = new mongoose.Schema({
         default: null
     }
 });
+
 
 module.exports = mongoose.model('Message', messageSchema);
