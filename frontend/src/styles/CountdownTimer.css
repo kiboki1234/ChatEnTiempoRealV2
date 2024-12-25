@@ -4,18 +4,22 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    margin: 20px;
+    margin: 20px auto; /* Centrar horizontalmente */
     padding: 20px;
     background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
     color: white;
     border-radius: 10px;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    max-width: 600px;
+    box-sizing: border-box;
 }
 
 .countdown-title {
     font-size: 2rem;
     font-weight: bold;
     margin-bottom: 10px;
+    text-align: center;
 }
 
 .countdown {
@@ -24,6 +28,7 @@
     gap: 10px;
     font-size: 1.5rem;
     font-weight: bold;
+    flex-wrap: wrap;
 }
 
 .time-box {
@@ -31,7 +36,7 @@
     padding: 15px;
     border-radius: 5px;
     text-align: center;
-    min-width: 80px;
+    min-width: 60px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
 }
 
@@ -40,4 +45,90 @@
     font-size: 1rem;
     font-weight: normal;
     margin-top: 5px;
+}
+
+.message-container {
+    text-align: center;
+    padding: 20px;
+}
+
+.message {
+    font-size: 1.8rem;
+    font-weight: bold;
+}
+
+.celebration {
+    font-size: 1rem;
+    margin-top: 10px;
+}
+
+.newyear-image {
+    width: 100%;
+    max-width: 300px;
+    height: auto;
+    border-radius: 10px;
+    margin-top: 15px;
+}
+
+.arbol {
+    width: 100%;
+    max-width: 300px;
+    height: auto;
+    border-radius: 10px;
+    margin-top: 15px;
+}
+
+/* Responsividad */
+@media (max-width: 768px) {
+    .countdown-title {
+        font-size: 1.5rem;
+    }
+
+    .countdown {
+        font-size: 1.2rem;
+    }
+
+    .time-box {
+        padding: 10px;
+        min-width: 50px;
+    }
+
+    .message {
+        font-size: 1.5rem;
+    }
+
+    .celebration {
+        font-size: 0.9rem;
+    }
+
+    .newyear-image, .arbol {
+        max-width: 200px;
+    }
+}
+
+@media (max-width: 480px) {
+    .countdown-title {
+        font-size: 1.2rem;
+    }
+
+    .countdown {
+        font-size: 1rem;
+    }
+
+    .time-box {
+        padding: 8px;
+        min-width: 40px;
+    }
+
+    .message {
+        font-size: 1.2rem;
+    }
+
+    .celebration {
+        font-size: 0.8rem;
+    }
+
+    .newyear-image, .arbol {
+        max-width: 150px;
+    }
 }
