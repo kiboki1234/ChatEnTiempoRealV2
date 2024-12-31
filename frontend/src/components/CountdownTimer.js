@@ -22,34 +22,35 @@ const CountdownTimer = () => {
     };
 
     // FECHAS DE PRODUCCIÓN
-    const christmasDate = new Date(new Date().getFullYear(), 11, 25, 0, 0, 0).getTime(); // 25 de diciembre
     const newYearDate = new Date(new Date().getFullYear() + 1, 0, 1, 0, 0, 0).getTime(); // 1 de enero
+    const backToSchoolDate = new Date(2025, 0, 6, 0, 0, 0).getTime(); // 6 de enero 2025
 
-    const [timeLeftChristmas, setTimeLeftChristmas] = useState(calculateTimeLeft(christmasDate));
     const [timeLeftNewYear, setTimeLeftNewYear] = useState(calculateTimeLeft(newYearDate));
-    const [isChristmas, setIsChristmas] = useState(false);
+    const [timeLeftBackToSchool, setTimeLeftBackToSchool] = useState(calculateTimeLeft(backToSchoolDate));
+
     const [isNewYear, setIsNewYear] = useState(false);
+    const [isBackToSchool, setIsBackToSchool] = useState(false);
 
     useEffect(() => {
         const timer = setInterval(() => {
-            const updatedTimeChristmas = calculateTimeLeft(christmasDate);
             const updatedTimeNewYear = calculateTimeLeft(newYearDate);
-            setTimeLeftChristmas(updatedTimeChristmas);
+            const updatedTimeBackToSchool = calculateTimeLeft(backToSchoolDate);
             setTimeLeftNewYear(updatedTimeNewYear);
-
-            // Verifica si el contador de Navidad llegó a cero o menos
-            if (!isChristmas && (updatedTimeChristmas.días <= 0 && updatedTimeChristmas.horas <= 0 && updatedTimeChristmas.minutos <= 0 && updatedTimeChristmas.segundos <= 0)) {
-                setIsChristmas(true);
-            }
+            setTimeLeftBackToSchool(updatedTimeBackToSchool);
 
             // Verifica si el contador de Año Nuevo llegó a cero o menos
             if (!isNewYear && (updatedTimeNewYear.días <= 0 && updatedTimeNewYear.horas <= 0 && updatedTimeNewYear.minutos <= 0 && updatedTimeNewYear.segundos <= 0)) {
                 setIsNewYear(true);
             }
+
+            // Verifica si el contador de Inicio de Clases llegó a cero o menos
+            if (!isBackToSchool && (updatedTimeBackToSchool.días <= 0 && updatedTimeBackToSchool.horas <= 0 && updatedTimeBackToSchool.minutos <= 0 && updatedTimeBackToSchool.segundos <= 0)) {
+                setIsBackToSchool(true);
+            }
         }, 1000);
 
         return () => clearInterval(timer);
-    }, [isChristmas, isNewYear, christmasDate, newYearDate]);
+    }, [isNewYear, isBackToSchool, newYearDate, backToSchoolDate]);
 
     const renderTime = (time) => {
         return (
@@ -66,26 +67,26 @@ const CountdownTimer = () => {
 
     return (
         <div className="countdown-container">
-            <h2 className="countdown-title">🎄 Navidad en:</h2>
-            {isChristmas ? (
-                <div className="message-container">
-                    <h2 className="message">🎅 ¡Feliz Navidad PERROS! 🎉</h2>
-                    <p className="celebration">Que la pasen bien y vayanse a la verg... 🎁✨</p>
-                    <img src="/images/arbol.gif" alt="Árbol de Navidad" className="arbol" />
-                </div>
-            ) : (
-                renderTime(timeLeftChristmas)
-            )}
-
             <h2 className="countdown-title">🎆 Año Nuevo en:</h2>
             {isNewYear ? (
                 <div className="message-container">
-                    <h2 className="message">🎇 ¡Feliz Año Nuevo! 🎆</h2>
-                    <p className="celebration">Que este nuevo año te traiga éxito, felicidad y prosperidad. 🎉🥂</p>
-                    <img src="/images/nieve.gif" alt="Fuegos artificiales" className="newyear-image" />
+                    <h2 className="message">🎇 ¡Feliz Año Nuevo malditos perros! 🎆</h2>
+                    <p className="celebration">Que este nuevo año les traiga éxito, felicidad y prosperidad. 🎉🥂</p>
+                    <img src="/images/anio.gif" alt="Fuegos artificiales" className="newyear-image" />
                 </div>
             ) : (
                 renderTime(timeLeftNewYear)
+            )}
+
+            <h2 className="countdown-title">📚 Inicio de Clases en:</h2>
+            {isBackToSchool ? (
+                <div className="message-container">
+                    <h2 className="message">🎒 ¡Felices clases! 📚</h2>
+                    <p className="celebration">Espero que tengas un gran inicio de clases y mucho éxito en tus estudios. ✏️📖</p>
+                    <img src="/images/clases.gif" alt="Inicio de clases" className="school-image" />
+                </div>
+            ) : (
+                renderTime(timeLeftBackToSchool)
             )}
         </div>
     );
