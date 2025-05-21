@@ -1,0 +1,320 @@
+import React, { useState, useEffect } from 'react';
+import socket from '../services/socketService';
+import '../App.css';
+
+const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
+    const [rooms, setRooms] = useState([]);
+    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [showJoinForm, setShowJoinForm] = useState(false);
+    const [showLoginForm, setShowLoginForm] = useState(false);
+    const [loginUsername, setLoginUsername] = useState('');
+    const [loginPassword, setLoginPassword] = useState('');
+    const [loginError, setLoginError] = useState('');
+    const [roomName, setRoomName] = useState('');
+    const [maxParticipants, setMaxParticipants] = useState(5);
+    const [pinToJoin, setPinToJoin] = useState('');
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+    const [generatedLink, setGeneratedLink] = useState('');
+    const [showLink, setShowLink] = useState(false);
+
+
+    useEffect(() => {
+        // Cargar salas existentes
+        fetch(`${process.env.REACT_APP_SOCKET_SERVER_URL}/api/rooms`)
+            .then(response => response.json())
+            .then(data => setRooms(data))
+            .catch(err => console.error('Error loading rooms:', err));
+
+        // Escuchar eventos de sala
+        socket.on('roomCreated', (room) => {
+            if (room.autoJoin) {
+                onJoinRoom(room.pin);
+            } else {
+                setRooms(prev => [...prev.filter(r => r.pin !== room.pin), room]);
+                setSuccess(`Nueva sala creada: ${room.name} (PIN: ${room.pin})`);
+                setTimeout(() => setSuccess(''), 5000);
+            }
+        });
+
+        socket.on('roomError', (data) => {
+            setError(data.message);
+            setTimeout(() => setError(''), 5000);
+        });
+
+        socket.on('userJoined', ({ participants }) => {
+            // Actualizar la lista de participantes en la sala actual
+            setRooms(prev => 
+                prev.map(room => 
+                    room.pin === currentRoom 
+                        ? { ...room, participants } 
+                        : room
+                )
+            );
+        });
+
+        socket.on('userLeft', ({ participants }) => {
+            // Actualizar la lista de participantes en la sala actual
+            setRooms(prev => 
+                prev.map(room => 
+                    room.pin === currentRoom 
+                        ? { ...room, participants } 
+                        : room
+                )
+            );
+        });
+
+        return () => {
+            socket.off('roomCreated');
+            socket.off('roomError');
+            socket.off('userJoined');
+            socket.off('userLeft');
+        };
+    }, [currentRoom, onJoinRoom]);
+
+    const handleCreateRoom = (e) => {
+        e.preventDefault();
+        if (!roomName.trim()) {
+            setError('El nombre de la sala es obligatorio');
+            return;
+        }
+
+        const newRoom = {
+            name: roomName,
+            maxParticipants: parseInt(maxParticipants, 10),
+            username,
+            autoJoin: false
+        };
+
+        // Escuchar el evento de sala creada
+        const onRoomCreated = (room) => {
+            if (room.autoJoin) return; 
+            
+            // Generar el enlace de la sala con el PIN correcto
+            const roomLink = `${window.location.origin}?room=${encodeURIComponent(room.name)}&pin=${room.pin}`;
+            setGeneratedLink(roomLink);
+            setShowLink(true);
+            
+            // Limpiar el listener después de usarlo
+            socket.off('roomCreated', onRoomCreated);
+        };
+
+        // Suscribirse al evento de sala creada
+        socket.on('roomCreated', onRoomCreated);
+
+        // Emitir el evento para crear la sala
+        socket.emit('createRoom', newRoom);
+
+        setRoomName('');
+        setMaxParticipants(5);
+        setShowCreateForm(false);
+    };
+
+    const handleJoinRoom = (e) => {
+        e.preventDefault();
+        if (!pinToJoin.trim()) {
+            setError('El PIN de la sala es obligatorio');
+            return;
+        }
+        
+        console.log('Attempting to join room with PIN:', pinToJoin);
+        onJoinRoom(pinToJoin);
+        setPinToJoin('');
+        setShowJoinForm(false);
+    };
+
+    // Add this new function to handle joining from the room list
+    const handleJoinRoomFromList = (pin) => {
+        console.log('Attempting to join room with PIN from list:', pin);
+        onJoinRoom(pin);
+    };
+
+    return (
+        <div className="room-manager">
+            <h2>Gestión de Salas</h2>
+            
+            {error && <div className="error-message">{error}</div>}
+            {success && <div className="success-message">{success}</div>}
+            
+            <div className="room-actions">
+                {showLoginForm ? (
+                    <button 
+                        onClick={() => {
+                            setShowLoginForm(false);
+                            setLoginUsername('');
+                            setLoginPassword('');
+                            setLoginError('');
+                        }}
+                        className="room-button"
+                    >
+                        Cerrar Sesión
+                    </button>
+                ) : (
+                    <button 
+                        onClick={() => {
+                            setShowLoginForm(true);
+                            setShowCreateForm(false);
+                            setShowJoinForm(false);
+                        }}
+                        className="room-button"
+                    >
+                        Crear Sala
+                    </button>
+                )}
+                <button 
+                    onClick={() => {
+                        setShowJoinForm(!showJoinForm);
+                        setShowCreateForm(false);
+                    }}
+                    className="room-button"
+                >
+                    Unirse a Sala
+                </button>
+                <button 
+                    onClick={() => onJoinRoom('general')}
+                    className={`room-button ${currentRoom === 'general' ? 'active' : ''}`}
+                >
+                    Chat General
+                </button>
+            </div>
+            
+            {showLoginForm && (
+                <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (loginUsername === 'admin' && loginPassword === 'admin') {
+                        setShowLoginForm(false);
+                        setShowCreateForm(true);
+                        setLoginError('');
+                    } else {
+                        setLoginError('Credenciales inválidas. Usuario: admin, Contraseña: admin');
+                    }
+                }} className="room-form">
+                    <h3>Iniciar Sesión</h3>
+                    <div className="form-group">
+                        <label>Usuario:</label>
+                        <input 
+                            type="text" 
+                            value={loginUsername} 
+                            onChange={(e) => setLoginUsername(e.target.value)}
+                            required
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label>Contraseña:</label>
+                        <input 
+                            type="password" 
+                            value={loginPassword} 
+                            onChange={(e) => setLoginPassword(e.target.value)}
+                            required
+                        />
+                    </div>
+                    {loginError && <div className="error-message">{loginError}</div>}
+                    <button type="submit" className="room-button">Iniciar Sesión</button>
+                </form>
+            )}
+            {showCreateForm && (
+                <form onSubmit={handleCreateRoom} className="room-form">
+                    <h3>Crear Nueva Sala</h3>
+                    <div className="form-group">
+                        <label>Nombre de la Sala:</label>
+                        <input 
+                            type="text" 
+                            value={roomName} 
+                            onChange={(e) => setRoomName(e.target.value)}
+                            placeholder="Nombre de la sala"
+                            required
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label>Máximo de Participantes:</label>
+                        <input 
+                            type="number" 
+                            value={maxParticipants} 
+                            onChange={(e) => setMaxParticipants(e.target.value)}
+                            min="2"
+                            max="20"
+                            required
+                        />
+                    </div>
+                    <button type="submit" className="submit-button">Crear Sala</button>
+                </form>
+            )}
+            
+            {showLink && (
+                <div className="room-form" style={{ marginTop: '20px' }}>
+                    <h3>¡Sala Creada!</h3>
+                    <p>Comparte este enlace para invitar a otros:</p>
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                        <input 
+                            type="text" 
+                            value={generatedLink} 
+                            readOnly
+                            style={{ flex: 1, padding: '8px' }}
+                        />
+                        <button 
+                            className="room-button"
+                            onClick={() => {
+                                navigator.clipboard.writeText(generatedLink);
+                                setSuccess('¡Enlace copiado al portapapeles!');
+                                setTimeout(() => setSuccess(''), 3000);
+                            }}
+                        >
+                            Copiar
+                        </button>
+                    </div>
+                    <p style={{ fontSize: '0.9em', marginBottom: '10px' }}>
+                        O comparte el PIN: <strong>{new URLSearchParams(generatedLink.split('?')[1]).get('pin')}</strong>
+                    </p>
+                    <button 
+                        className="room-button"
+                        onClick={() => setShowLink(false)}
+                    >
+                        Cerrar
+                    </button>
+                </div>
+            )}
+            
+            {showJoinForm && (
+                <form onSubmit={handleJoinRoom} className="room-form">
+                    <h3>Unirse a una Sala</h3>
+                    <div className="form-group">
+                        <label>PIN de la Sala:</label>
+                        <input 
+                            type="text" 
+                            value={pinToJoin} 
+                            onChange={(e) => setPinToJoin(e.target.value)}
+                            placeholder="Ingresa el PIN de 6 dígitos"
+                            pattern="[0-9]{6}"
+                            title="El PIN debe tener 6 dígitos"
+                            required
+                        />
+                    </div>
+                    <button type="submit" className="submit-button">Unirse</button>
+                </form>
+            )}
+            
+            <div className="rooms-list">
+                <h3>Salas Disponibles</h3>
+
+                {rooms.length === 0 ? (
+                    <p>No hay salas disponibles</p>
+                ) : (
+                    <ul>
+                        {rooms.map(room => (
+                            <li key={room.pin} className={`room-item ${currentRoom === room.pin ? 'active' : ''}`}>
+                                <div className="room-info">
+                                    <span className="room-name">{room.name}</span>
+                                    <span className="room-participants">
+                                        {room.participants ? room.participants.length : 0}/{room.maxParticipants} usuarios
+                                    </span>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default RoomManager;

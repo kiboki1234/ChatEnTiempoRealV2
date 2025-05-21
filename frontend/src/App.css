@@ -254,3 +254,337 @@ body.dark-mode .emoji-picker-container {
 .send-button:hover {
     background-color: #388e3c;
 }
+
+/* Room Manager Styles */
+.room-manager {
+    margin: 15px 0;
+    padding: 15px;
+    background-color: #f5f5f5;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+}
+
+body.dark-mode .room-manager {
+    background-color: #2a2a2a;
+    border-color: #444;
+}
+
+.room-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+.room-button {
+    padding: 8px 15px;
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.room-button:hover {
+    background-color: #45a049;
+}
+
+.room-button.active {
+    background-color: #388e3c;
+}
+
+body.dark-mode .room-button {
+    background-color: #388e3c;
+}
+
+body.dark-mode .room-button:hover {
+    background-color: #2e7d32;
+}
+
+body.dark-mode .room-button.active {
+    background-color: #0d47a1;
+}
+
+.room-form {
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+body.dark-mode .room-form {
+    background-color: #333;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.form-group {
+    margin-bottom: 12px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+body.dark-mode .form-group input {
+    background-color: #444;
+    border-color: #555;
+    color: #e0e0e0;
+}
+
+.submit-button {
+    padding: 8px 15px;
+    background-color: #1976d2;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.submit-button:hover {
+    background-color: #1565c0;
+}
+
+body.dark-mode .submit-button {
+    background-color: #1565c0;
+}
+
+body.dark-mode .submit-button:hover {
+    background-color: #0d47a1;
+}
+
+.rooms-list {
+    margin-top: 15px;
+}
+
+.rooms-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.room-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    margin-bottom: 8px;
+    background-color: #fff;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+}
+
+.room-item.active {
+    border-color: #1976d2;
+    background-color: #e3f2fd;
+}
+
+body.dark-mode .room-item {
+    background-color: #333;
+    border-color: #444;
+}
+
+body.dark-mode .room-item.active {
+    border-color: #1976d2;
+    background-color: #0d47a1;
+}
+
+.room-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.room-name {
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.room-pin {
+    font-size: 14px;
+    color: #666;
+    margin-top: 3px;
+}
+
+body.dark-mode .room-pin {
+    color: #aaa;
+}
+
+.room-participants {
+    font-size: 12px;
+    color: #888;
+    margin-top: 3px;
+}
+
+body.dark-mode .room-participants {
+    color: #999;
+}
+
+.join-button {
+    padding: 6px 12px;
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.join-button:hover {
+    background-color: #388e3c;
+}
+
+.join-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+body.dark-mode .join-button {
+    background-color: #388e3c;
+}
+
+body.dark-mode .join-button:hover {
+    background-color: #2e7d32;
+}
+
+body.dark-mode .join-button:disabled {
+    background-color: #555;
+}
+
+.error-message {
+    background-color: #ffebee;
+    color: #c62828;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    border-left: 4px solid #c62828;
+}
+
+body.dark-mode .error-message {
+    background-color: #4a1515;
+    color: #ff8a80;
+    border-left-color: #c62828;
+}
+
+.success-message {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    border-left: 4px solid #2e7d32;
+}
+
+body.dark-mode .success-message {
+    background-color: #1b3a1b;
+    color: #81c784;
+    border-left-color: #2e7d32;
+}
+
+.current-room-info {
+    background-color: #e3f2fd;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+body.dark-mode .current-room-info {
+    background-color: #0d47a1;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .room-actions {
+        flex-direction: column;
+    }
+    
+    .room-button {
+        width: 100%;
+    }
+}
+
+/* Room Participants List */
+.room-participants-list {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #f5f5f5;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+}
+
+body.dark-mode .room-participants-list {
+    background-color: #2a2a2a;
+    border-color: #444;
+}
+
+.room-participants-list h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 16px;
+    color: #333;
+}
+
+body.dark-mode .room-participants-list h4 {
+    color: #e0e0e0;
+}
+
+.room-participants-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.participant-item {
+    display: flex;
+    align-items: center;
+    padding: 5px 0;
+}
+
+.participant-icon {
+    margin-right: 8px;
+    color: #4caf50;
+}
+
+body.dark-mode .participant-icon {
+    color: #81c784;
+}
+
+.participant-name {
+    font-size: 14px;
+}
+
+/* Leave Room Button */
+.leave-room-button {
+    background-color: #f44336;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 10px;
+    font-weight: bold;
+    transition: background-color 0.3s;
+}
+
+.leave-room-button:hover {
+    background-color: #d32f2f;
+}
+
+body.dark-mode .leave-room-button {
+    background-color: #b71c1c;
+}
+
+body.dark-mode .leave-room-button:hover {
+    background-color: #7f0000;
+}

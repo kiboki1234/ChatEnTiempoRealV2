@@ -1,15 +1,8 @@
 const express = require('express');
 const multer = require('multer');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const { v2: cloudinary } = require('cloudinary');
+const cloudinary = require('../configs/cloudinaryConfig');
 const router = express.Router();
-
-// Configurar Cloudinary
-cloudinary.config({
-    cloud_name: 'dv7ooyvmy',
-    api_key: '439479121887299',
-    api_secret: 'wTSH-fbfFyufhklaNJcGxn-gmfc'
-});
 
 // Configurar almacenamiento en Cloudinary
 const storage = new CloudinaryStorage({
@@ -20,14 +13,25 @@ const storage = new CloudinaryStorage({
     },
 });
 
-const upload = multer({ storage });
+const upload = multer({ 
+    storage,
+    limits: {
+        fileSize: 5 * 1024 * 1024 // Límite de 5MB
+    }
+});
 
 // Endpoint para cargar imágenes
 router.post('/upload', upload.single('image'), (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ error: 'No se ha subido ninguna imagen.' });
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No se ha subido ninguna imagen.' });
+        }
+        console.log('Imagen subida a Cloudinary:', req.file.path);
+        res.status(200).json({ imageUrl: req.file.path });
+    } catch (error) {
+        console.error('Error al subir imagen:', error);
+        res.status(500).json({ error: 'Error al procesar la imagen' });
     }
-    res.status(200).json({ imageUrl: req.file.path });
 });
 
 // Endpoint para obtener mensajes

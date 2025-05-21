@@ -18,11 +18,27 @@ const Disclaimer = ({ onAccept }) => {
 
 const App = () => {
     const [accepted, setAccepted] = useState(false);
+    const [roomPin, setRoomPin] = useState(null);
+    const [roomName, setRoomName] = useState('');
 
     useEffect(() => {
         const hasAccepted = localStorage.getItem('acceptedDisclaimer');
         if (hasAccepted) {
             setAccepted(true);
+        }
+
+        // Obtener parámetros de la URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const pin = urlParams.get('pin');
+        const name = urlParams.get('room');
+
+        if (pin) {
+            setRoomPin(pin);
+            setRoomName(name || 'Sala privada');
+            // Aceptar automáticamente el disclaimer si se accede desde un enlace
+            if (!hasAccepted) {
+                handleAccept();
+            }
         }
     }, []);
 
@@ -31,14 +47,23 @@ const App = () => {
         setAccepted(true);
     };
 
+    // Efecto para manejar la conexión a la sala cuando se tienen los datos necesarios
+    useEffect(() => {
+        if (accepted && roomPin) {
+            // Aquí podrías agregar lógica para unirte automáticamente a la sala
+            // usando el roomPin y roomName
+            console.log(`Uniéndose automáticamente a la sala: ${roomName} (${roomPin})`);
+        }
+    }, [accepted, roomPin, roomName]);
+
     return (
         <div>
             {accepted ? (
                 <>
                     <CountdownTimer />
-                    <ChatBox />
+                    <ChatBox initialRoomPin={roomPin} />
                     <div style={{ padding: '10px', marginTop: '20px', textAlign: 'center', backgroundColor: '#f0f8ff', border: '1px solid #ccc', borderRadius: '8px' }}>
-                        <p style={{ fontSize: '14px', color: '#555' }}>🛠️ Próxima actualización: Soporte para audio</p>
+                        <p style={{ fontSize: '14px', color: '#555' }}>🛠️ Nueva funcionalidad: Salas de chat privadas con PIN</p>
                     </div>
                 </>
             ) : (

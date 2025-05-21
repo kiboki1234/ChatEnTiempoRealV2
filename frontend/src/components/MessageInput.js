@@ -5,7 +5,7 @@ import EmojiPicker from 'emoji-picker-react';
 import socket from '../services/socketService';
 import '../App.css';
 
-const MessageInput = ({ username, replyTo, setReplyTo }) => {
+const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
     const [input, setInput] = useState('');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [image, setImage] = useState(null);
@@ -24,13 +24,21 @@ const MessageInput = ({ username, replyTo, setReplyTo }) => {
             const formData = new FormData();
             formData.append('image', image);
             try {
+                // Asegúrate de que la URL sea correcta
                 const response = await axios.post(
-                    'https://chatentiemporealv2.onrender.com/api/chat/upload',
-                    formData
+                    `${process.env.REACT_APP_SOCKET_SERVER_URL}/api/chat/upload`,
+                    formData,
+                    {
+                        headers: {
+                            'Content-Type': 'multipart/form-data'
+                        }
+                    }
                 );
                 imageUrl = response.data.imageUrl;
+                console.log('Imagen subida correctamente:', imageUrl);
             } catch (error) {
                 console.error('Error al subir imagen:', error);
+                alert('Error al subir la imagen. Por favor, intenta de nuevo.');
                 return;
             }
         }
@@ -40,10 +48,12 @@ const MessageInput = ({ username, replyTo, setReplyTo }) => {
             message: input,
             imageUrl,
             sticker: '',
-            replyTo: replyTo ? { _id: replyTo._id, username: replyTo.username, message: replyTo.message } : null,
+            roomPin,
+            replyTo: replyTo ? replyTo._id : null,
             timestamp: new Date().toISOString(),
         };
 
+        console.log('Enviando mensaje:', newMessage);
         socket.emit('sendMessage', newMessage);
         setInput('');
         setImage(null);
@@ -76,6 +86,7 @@ const MessageInput = ({ username, replyTo, setReplyTo }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    // Asegúrate de que el input de archivo esté correctamente configurado
     return (
         <div className="message-input">
             {replyTo && (
@@ -86,20 +97,23 @@ const MessageInput = ({ username, replyTo, setReplyTo }) => {
                     </button>
                 </div>
             )}
-            <button className="emoji-button" onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
-                <FaSmile />
-            </button>
-            {showEmojiPicker && (
-                <div ref={emojiPickerRef} className="emoji-picker-container">
-                    <EmojiPicker onEmojiClick={addEmojiToInput} />
-                </div>
-            )}
+            
             <input
-                className="input-box"
+                type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyPress}
+                onKeyPress={handleKeyPress}
+                placeholder="Escribe un mensaje..."
+                className="input-box"
             />
+            
+            <button
+                className="emoji-button"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            >
+                <FaSmile />
+            </button>
+            
             <label htmlFor="image-upload" className="image-upload-button">
                 <FaImage />
             </label>
@@ -110,9 +124,16 @@ const MessageInput = ({ username, replyTo, setReplyTo }) => {
                 onChange={handleImageChange}
                 style={{ display: 'none' }}
             />
-            <button className="send-button" onClick={sendMessage}>
+            
+            <button onClick={sendMessage} className="send-button">
                 <FaPaperPlane />
             </button>
+            
+            {showEmojiPicker && (
+                <div className="emoji-picker-container" ref={emojiPickerRef}>
+                    <EmojiPicker onEmojiClick={addEmojiToInput} />
+                </div>
+            )}
         </div>
     );
 };

@@ -4,7 +4,11 @@ const messageSchema = new mongoose.Schema({
     username: String,
     message: String,
     sticker: String,
-    imageUrl: String, // Nuevo campo para imágenes
+    imageUrl: String,
+    roomPin: {
+        type: String,
+        default: 'general' // 'general' for the main chat
+    },
     timestamp: {
         type: Date,
         default: Date.now,
@@ -15,6 +19,5 @@ const messageSchema = new mongoose.Schema({
         default: null
     }
 });
-
 
 module.exports = mongoose.model('Message', messageSchema);
