@@ -43,7 +43,7 @@ const ChatBox = ({ initialRoomPin }) => {
         if (storedUsername) {
             return storedUsername;
         } else {
-            const newUsername = `Viuda-${Math.random().toString(36).substring(2, 8)}`;
+            const newUsername = `User-${Math.random().toString(36).substring(2, 8)}`;
             localStorage.setItem('username', newUsername);
             return newUsername;
         }
@@ -168,7 +168,8 @@ const ChatBox = ({ initialRoomPin }) => {
         if (window.confirm('¿Estás seguro de que quieres salir de la sala?')) {
             try {
                 socket.emit('leaveRoom');
-                handleJoinRoom('general'); // Redirigir al chat general
+                // Redirigir a la página principal usando la URL base del .env
+                window.location.href = process.env.REACT_APP_BASE_URL || 'http://localhost:3000';
             } catch (error) {
                 setError('Error al salir de la sala. Por favor, inténtalo de nuevo.');
                 setTimeout(() => setError(''), 5000);

@@ -33,4 +33,4 @@ server.listen(PORT, () => {
 });
 
 // Cargar Socket.IO por separado
-require('./socket')(server); // Pasa el servidor HTTP al socket
+require('./socket')(server); // Pasa el servidor HTTP al socket 

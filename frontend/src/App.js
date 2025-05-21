@@ -50,7 +50,6 @@ const App = () => {
     // Efecto para manejar la conexión a la sala cuando se tienen los datos necesarios
     useEffect(() => {
         if (accepted && roomPin) {
-            // Aquí podrías agregar lógica para unirte automáticamente a la sala
             // usando el roomPin y roomName
             console.log(`Uniéndose automáticamente a la sala: ${roomName} (${roomPin})`);
         }
@@ -60,11 +59,11 @@ const App = () => {
         <div>
             {accepted ? (
                 <>
-                    <CountdownTimer />
+                        <CountdownTimer />
                     <ChatBox initialRoomPin={roomPin} />
                     <div style={{ padding: '10px', marginTop: '20px', textAlign: 'center', backgroundColor: '#f0f8ff', border: '1px solid #ccc', borderRadius: '8px' }}>
-                        <p style={{ fontSize: '14px', color: '#555' }}>🛠️ Nueva funcionalidad: Salas de chat privadas con PIN</p>
-                    </div>
+                            <p style={{ fontSize: '14px', color: '#555' }}>🛠️ Nueva funcionalidad: Salas de chat privadas con PIN</p>
+                        </div>
                 </>
             ) : (
                 <Disclaimer onAccept={handleAccept} />
