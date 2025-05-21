@@ -7,7 +7,15 @@ const socketRooms = new Map();
 
 module.exports = (server) => {
     const io = new Server(server, {
-        cors: { origin: '*' }
+        cors: {
+            origin: process.env.FRONTEND_URL || 'https://chat-en-tiempo-real-v2.vercel.app',
+            methods: ['GET', 'POST'],
+            credentials: true
+        },
+        transports: ['websocket', 'polling'],
+        pingTimeout: 10000,
+        pingInterval: 25000,
+        cookie: false
     });
 
     const emitRoomUpdate = (room) => {
