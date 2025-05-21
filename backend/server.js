@@ -17,9 +17,15 @@ app.use(cors({
     origin: process.env.FRONTEND_URL || 'https://chat-en-tiempo-real-v2.vercel.app',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'Content-Length', 'X-Requested-With']
 }));
-app.use(express.json());
+
+// Increase the limit for JSON and URL-encoded bodies
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Trust first proxy (important when behind load balancers like on Render)
+app.set('trust proxy', 1);
 
 // Rutas
 app.use('/api/chat', chatRoutes);

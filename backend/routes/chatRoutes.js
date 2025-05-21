@@ -16,7 +16,16 @@ const storage = new CloudinaryStorage({
 const upload = multer({ 
     storage,
     limits: {
-        fileSize: 5 * 1024 * 1024 // Límite de 5MB
+        fileSize: 10 * 1024 * 1024, // Aumentado a 10MB
+        files: 1,
+        fields: 5
+    },
+    fileFilter: (req, file, cb) => {
+        // Aceptar solo imágenes
+        if (!file.mimetype.match(/\/(jpg|jpeg|png|gif)$/)) {
+            return cb(new Error('Solo se permiten archivos de imagen (jpg, jpeg, png, gif)'), false);
+        }
+        cb(null, true);
     }
 });
 
