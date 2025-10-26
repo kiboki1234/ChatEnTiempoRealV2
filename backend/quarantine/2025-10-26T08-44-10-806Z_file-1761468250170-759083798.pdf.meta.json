@@ -1,0 +1,21 @@
+{
+  "originalPath": "D:\\proyectosPersonales\\ChatEnTiempoRealV2Git\\VersionSala2\\Chat\\ChatEnTiempoRealV2\\backend\\temp\\file-1761468250170-759083798.pdf",
+  "quarantinedPath": "D:\\proyectosPersonales\\ChatEnTiempoRealV2Git\\VersionSala2\\Chat\\ChatEnTiempoRealV2\\backend\\quarantine\\2025-10-26T08-44-10-806Z_file-1761468250170-759083798.pdf",
+  "timestamp": "2025-10-26T08:44:10.808Z",
+  "analysisResult": {
+    "suspicious": true,
+    "entropy": "7.934",
+    "fileSize": 722121,
+    "hasNullBytes": true,
+    "reason": "High entropy suggests possible hidden data"
+  },
+  "userMetadata": {
+    "userId": "::1",
+    "username": "andres",
+    "ipAddress": "::1",
+    "roomPin": "general",
+    "originalName": "IEEE_830_ERS_CASA_MILITAR (1).pdf",
+    "fileType": "application/pdf"
+  },
+  "status": "QUARANTINED"
+}

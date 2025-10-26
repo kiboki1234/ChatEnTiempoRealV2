@@ -1,0 +1,21 @@
+{
+  "originalPath": "D:\\proyectosPersonales\\ChatEnTiempoRealV2Git\\VersionSala2\\Chat\\ChatEnTiempoRealV2\\backend\\temp\\file-1761468091882-978953379.pdf",
+  "quarantinedPath": "D:\\proyectosPersonales\\ChatEnTiempoRealV2Git\\VersionSala2\\Chat\\ChatEnTiempoRealV2\\backend\\quarantine\\2025-10-26T08-41-32-448Z_file-1761468091882-978953379.pdf",
+  "timestamp": "2025-10-26T08:41:32.451Z",
+  "analysisResult": {
+    "suspicious": true,
+    "entropy": "7.956",
+    "fileSize": 440861,
+    "hasNullBytes": true,
+    "reason": "High entropy suggests possible hidden data"
+  },
+  "userMetadata": {
+    "userId": "::1",
+    "username": "andres",
+    "ipAddress": "::1",
+    "roomPin": "general",
+    "originalName": "ChiliquingaEspinSanmartinFerrin_Tarea1P1.pdf",
+    "fileType": "application/pdf"
+  },
+  "status": "QUARANTINED"
+}

@@ -19,6 +19,7 @@ const roomRoutes = require('./routes/roomRoutes');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const userAuthRoutes = require('./routes/userAuthRoutes');
+const securityRoutes = require('./routes/securityRoutes');
 const uploadMiddleware = require('./middlewares/uploadMiddleware');
 
 // Inicializar Express
@@ -77,6 +78,7 @@ app.use('/api/rooms', roomRoutes);
 app.use('/api/auth', authRoutes); // Admin auth
 app.use('/api/user-auth', userAuthRoutes); // User auth
 app.use('/api/users', userRoutes);
+app.use('/api/security', securityRoutes); // Security management
 app.use('/api', uploadMiddleware);
 
 // Error handling middleware
@@ -100,11 +102,17 @@ app.use((req, res) => {
 });
 
 // Initialize services
+const quarantineService = require('./services/quarantineService');
+
 const initializeServices = async () => {
     try {
         // Initialize encryption service
         await encryptionService.initialize();
         console.log('✓ Encryption service initialized');
+        
+        // Initialize quarantine service
+        await quarantineService.init();
+        console.log('✓ Quarantine service initialized');
         
         // Schedule cleanup of expired rooms and inactive users (every hour)
         setInterval(async () => {
@@ -116,6 +124,16 @@ const initializeServices = async () => {
                 console.error('Error in scheduled cleanup:', error);
             }
         }, 60 * 60 * 1000); // 1 hour
+        
+        // Schedule cleanup of old quarantined files (daily)
+        setInterval(async () => {
+            try {
+                await quarantineService.cleanOldFiles(30);
+                console.log('✓ Quarantine cleanup completed');
+            } catch (error) {
+                console.error('Error in quarantine cleanup:', error);
+            }
+        }, 24 * 60 * 60 * 1000); // 24 hours
         
         console.log('✓ Scheduled tasks configured');
     } catch (error) {

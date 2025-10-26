@@ -113,11 +113,48 @@ async function analyzeImage(filePath, threshold = 7.5) {
     }
 }
 
+// Analyze non-image files
+async function analyzeFile(filePath, threshold = 7.9) {
+    try {
+        const stats = await fs.stat(filePath);
+        const buffer = await fs.readFile(filePath);
+        
+        const entropy = calculateEntropy(buffer);
+        
+        // Most compressed formats (PDF, ZIP, videos, etc.) have entropy 7.5-7.9
+        // Only flag if entropy is EXTREMELY high (>7.9) which suggests additional encryption/steganography
+        const suspicious = entropy > threshold;
+        
+        return {
+            success: true,
+            result: {
+                suspicious,
+                entropy: entropy.toFixed(3),
+                fileSize: stats.size,
+                hasNullBytes: buffer.includes(0x00),
+                reason: suspicious ? 'Extremely high entropy suggests possible hidden data or additional encryption' : 'File entropy is within normal range for compressed formats'
+            }
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
 // Main worker execution
 (async () => {
     try {
         const { filePath, fileType, threshold } = workerData;
-        const result = await analyzeImage(filePath, threshold);
+        
+        // Determine if it's an image or other file type
+        const isImage = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(fileType);
+        
+        const result = isImage 
+            ? await analyzeImage(filePath, threshold)
+            : await analyzeFile(filePath, threshold);
+            
         parentPort.postMessage(result);
     } catch (error) {
         parentPort.postMessage({

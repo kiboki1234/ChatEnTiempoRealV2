@@ -5,10 +5,33 @@ const fs = require('fs').promises;
 const cloudinary = require('../configs/cloudinaryConfig');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const steganographyDetector = require('../services/steganographyDetector');
+const quarantineService = require('../services/quarantineService');
 const { steganographyWorkerPool } = require('../services/workerPool');
 const AuditLog = require('../models/AuditLog');
 const router = express.Router();
 require('dotenv').config();
+
+// Helper function to delete file with retries (for Windows file locks)
+async function safeDeleteFile(filePath, maxRetries = 3, delayMs = 100) {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            await fs.unlink(filePath);
+            return true;
+        } catch (error) {
+            if (error.code === 'EPERM' || error.code === 'EBUSY') {
+                if (i < maxRetries - 1) {
+                    // Wait before retrying
+                    await new Promise(resolve => setTimeout(resolve, delayMs * (i + 1)));
+                    continue;
+                }
+            }
+            // If it's not a permission error or we've exhausted retries, log and continue
+            console.warn(`[WARN] Could not delete temp file ${filePath}:`, error.message);
+            return false;
+        }
+    }
+    return false;
+}
 
 // Temporary storage for analysis
 const tempStorage = multer.diskStorage({
@@ -29,12 +52,32 @@ const tempStorage = multer.diskStorage({
 
 // File filter
 const fileFilter = (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+    // Tipos de archivo permitidos con límites razonables
+    const allowedTypes = [
+        // Imágenes
+        'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/svg+xml',
+        // Documentos
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'text/plain',
+        // Videos
+        'video/mp4', 'video/avi', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska',
+        // Audios
+        'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/x-m4a',
+        // Archivos comprimidos
+        'application/zip', 'application/x-zip-compressed',
+        'application/x-rar-compressed', 'application/x-7z-compressed'
+    ];
     
     if (allowedTypes.includes(file.mimetype)) {
         cb(null, true);
     } else {
-        cb(new Error('Invalid file type. Only JPEG, PNG, GIF, WEBP, and PDF are allowed.'), false);
+        cb(new Error(`Tipo de archivo no permitido: ${file.mimetype}. Por favor, verifica los tipos de archivo permitidos.`), false);
     }
 };
 
@@ -57,8 +100,55 @@ const cloudinaryStorageConfig = new CloudinaryStorage({
     },
 });
 
-// Endpoint to upload files with steganography detection
-router.post('/upload', upload.single('file'), async (req, res) => {
+// Middleware para manejar errores de multer
+const handleMulterError = (err, req, res, next) => {
+    if (err instanceof multer.MulterError) {
+        // Error de Multer (tamaño de archivo, etc.)
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ 
+                error: 'Archivo demasiado grande',
+                details: 'El tamaño máximo permitido es 10MB'
+            });
+        }
+        return res.status(400).json({ 
+            error: 'Error al procesar el archivo',
+            details: err.message 
+        });
+    } else if (err) {
+        // Error personalizado del fileFilter
+        if (err.message.includes('Tipo de archivo no permitido')) {
+            return res.status(400).json({ 
+                error: '🚫 Tipo de archivo no permitido por seguridad',
+                details: err.message,
+                allowedTypes: [
+                    '📷 Imágenes: JPG, PNG, GIF, WebP, BMP, SVG',
+                    '📄 Documentos: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT',
+                    '🎬 Videos: MP4, AVI, MOV, MKV',
+                    '🎵 Audio: MP3, WAV, OGG, M4A',
+                    '🗜️ Comprimidos: ZIP, RAR, 7Z'
+                ],
+                blockedReason: err.message.includes('x-msdownload') || err.message.includes('executable') 
+                    ? '⚠️ Los archivos ejecutables (.exe, .bat, .cmd, .sh) están bloqueados por razones de seguridad'
+                    : 'Este tipo de archivo no está en la lista de permitidos'
+            });
+        }
+        return res.status(400).json({ 
+            error: 'Error al subir archivo',
+            details: err.message 
+        });
+    }
+    next();
+};
+
+// Main upload endpoint with comprehensive security analysis
+router.post('/upload', (req, res, next) => {
+    upload.single('file')(req, res, (err) => {
+        if (err) {
+            return handleMulterError(err, req, res, next);
+        }
+        next();
+    });
+}, async (req, res) => {
     let tempFilePath = null;
     
     try {
@@ -68,67 +158,218 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         
         tempFilePath = req.file.path;
         const { roomPin, username } = req.body;
+        const userId = req.ip || 'unknown';
+        const ipAddress = req.ip || req.connection.remoteAddress;
         
-        // Get room type to determine if multimedia is allowed
-        const Room = require('../models/Room');
-        const room = await Room.findOne({ pin: roomPin });
+        // Verificar si es chat general o sala con PIN
+        let isMultimediaAllowed = true;
         
-        if (!room) {
-            await fs.unlink(tempFilePath);
-            return res.status(404).json({ error: 'Room not found' });
+        if (roomPin && roomPin !== 'general') {
+            // Get room type to determine if multimedia is allowed
+            const Room = require('../models/Room');
+            const room = await Room.findOne({ pin: roomPin });
+            
+            if (!room) {
+                await safeDeleteFile(tempFilePath);
+                return res.status(404).json({ error: 'Room not found' });
+            }
+            
+            if (room.type !== 'multimedia') {
+                await safeDeleteFile(tempFilePath);
+                return res.status(403).json({ error: 'File uploads not allowed in text-only rooms' });
+            }
         }
-        
-        if (room.type !== 'multimedia') {
-            await fs.unlink(tempFilePath);
-            return res.status(403).json({ error: 'File uploads not allowed in text-only rooms' });
-        }
+        // Si no hay roomPin o es 'general', permitir (chat general siempre permite multimedia)
         
         // Analyze file for steganography using worker thread
-        console.log('Analyzing file for steganography...');
-        const analysisResult = await steganographyWorkerPool.executeTask({
-            filePath: tempFilePath,
-            fileType: req.file.mimetype,
-            threshold: 7.5
-        });
+        console.log(`[SECURITY] Analyzing file: ${req.file.originalname} (${req.file.mimetype})`);
         
-        if (!analysisResult.success) {
-            await fs.unlink(tempFilePath);
-            return res.status(500).json({ error: 'Error analyzing file' });
+        let analysisResult;
+        try {
+            analysisResult = await steganographyWorkerPool.executeTask({
+                filePath: tempFilePath,
+                fileType: req.file.mimetype,
+                threshold: 7.95  // Higher threshold for better accuracy
+            });
+        } catch (workerError) {
+            console.error('[ERROR] Worker pool error:', workerError);
+            await safeDeleteFile(tempFilePath);
+            return res.status(500).json({ 
+                error: 'Error analyzing file security',
+                details: workerError.message 
+            });
+        }
+        
+        if (!analysisResult || !analysisResult.success) {
+            console.error('[ERROR] Analysis failed:', analysisResult?.error || 'Unknown error');
+            await safeDeleteFile(tempFilePath);
+            return res.status(500).json({ 
+                error: 'Error analyzing file', 
+                details: analysisResult?.error || 'Analysis returned no result'
+            });
         }
         
         const analysis = analysisResult.result;
         
+        // Enrich analysis with security scoring
+        if (!analysis.riskScore) {
+            analysis.riskScore = 0;
+            analysis.riskFactors = [];
+            
+            // Check if file type naturally has high entropy (compressed formats)
+            const compressedFormats = [
+                'application/pdf',
+                'application/zip',
+                'application/x-zip-compressed',
+                'application/x-rar-compressed',
+                'application/x-7z-compressed',
+                'video/mp4',
+                'video/mpeg',
+                'video/quicktime',
+                'audio/mpeg',
+                'audio/mp4',
+                'image/jpeg',
+                'image/png',
+                'image/webp',
+                'application/vnd.openxmlformats-officedocument',
+                'application/vnd.ms-excel',
+                'application/vnd.ms-powerpoint'
+            ];
+            
+            const isCompressedFormat = compressedFormats.some(format => 
+                req.file.mimetype.includes(format.split('/')[1]) || 
+                req.file.mimetype === format
+            );
+            
+            // Adjust entropy thresholds based on file type
+            const entropyThresholds = isCompressedFormat 
+                ? { critical: 7.95, high: 7.85, elevated: 7.75 }  // More lenient for compressed files
+                : { critical: 7.7, high: 7.4, elevated: 7.0 };     // Stricter for uncompressed files
+            
+            // Calculate risk score based on entropy
+            const entropy = parseFloat(analysis.entropy);
+            if (entropy > entropyThresholds.critical) {
+                analysis.riskScore += 4;
+                analysis.riskFactors.push('Extremely high entropy detected');
+            } else if (entropy > entropyThresholds.high) {
+                analysis.riskScore += 2;
+                analysis.riskFactors.push('High entropy detected');
+            } else if (entropy > entropyThresholds.elevated) {
+                analysis.riskScore += 1;
+                analysis.riskFactors.push('Elevated entropy');
+            }
+            
+            // Add risk for LSB anomalies (images only)
+            if (analysis.lsbAnalysis?.suspicious) {
+                analysis.riskScore += 3;
+                analysis.riskFactors.push('LSB pattern anomaly');
+            }
+            
+            // Add risk for channel anomalies (images only)
+            if (analysis.channelAnalysis?.suspicious) {
+                analysis.riskScore += 2;
+                analysis.riskFactors.push('Color channel anomaly');
+            }
+            
+            // Null bytes are normal in many binary formats, only flag if excessive
+            if (analysis.hasNullBytes && !isCompressedFormat) {
+                // Only add minor risk for null bytes in text-based formats
+                if (req.file.mimetype.includes('text/') || req.file.mimetype.includes('xml')) {
+                    analysis.riskScore += 2;
+                    analysis.riskFactors.push('Unexpected null bytes in text file');
+                }
+            }
+            
+            // Check file size anomalies (files that are too small or suspiciously large)
+            const fileSize = req.file.size;
+            const expectedMinSize = {
+                'application/pdf': 1000,        // PDFs are typically > 1KB
+                'image/jpeg': 500,              // JPEGs are typically > 500 bytes
+                'image/png': 500,
+                'video/': 10000,                // Videos are typically > 10KB
+                'audio/': 5000                  // Audio files are typically > 5KB
+            };
+            
+            for (const [type, minSize] of Object.entries(expectedMinSize)) {
+                if (req.file.mimetype.includes(type) && fileSize < minSize) {
+                    analysis.riskScore += 2;
+                    analysis.riskFactors.push(`Unusually small ${type.split('/')[0]} file`);
+                    break;
+                }
+            }
+            
+            // Determine severity based on risk score
+            if (analysis.riskScore >= 8) {
+                analysis.severity = 'CRITICAL';
+            } else if (analysis.riskScore >= 5) {
+                analysis.severity = 'HIGH';
+            } else if (analysis.riskScore >= 3) {
+                analysis.severity = 'MEDIUM';
+            } else {
+                analysis.severity = 'LOW';
+            }
+            
+            // Update suspicious flag based on risk score (raised threshold)
+            if (analysis.riskScore >= 6) {
+                analysis.suspicious = true;
+            } else {
+                analysis.suspicious = false;  // Override worker's decision with our scoring
+            }
+        }
+        
+        // Generate security report
+        const securityReport = steganographyDetector.generateSecurityReport(analysis);
+        
         // Log the analysis
-        await AuditLog.createLog({
-            action: analysis.suspicious ? 'FILE_REJECTED' : 'UPLOAD_FILE',
-            userId: req.ip || 'unknown',
+        await AuditLog.create({
+            action: analysis.suspicious ? 'FILE_REJECTED' : 'FILE_APPROVED',
+            userId,
             username: username || 'anonymous',
-            ipAddress: req.ip || req.connection.remoteAddress,
+            ipAddress,
             userAgent: req.headers['user-agent'],
-            roomPin,
+            roomPin: roomPin || 'general',
             details: {
                 filename: req.file.originalname,
                 fileType: req.file.mimetype,
                 fileSize: req.file.size,
                 analysis: analysis,
+                securityReport,
                 suspicious: analysis.suspicious
             }
         });
         
-        // If file is suspicious, reject it
+        // If file is suspicious, quarantine it and reject upload
         if (analysis.suspicious) {
-            await fs.unlink(tempFilePath);
+            console.log(`[SECURITY] File rejected: ${req.file.originalname} - Risk Score: ${analysis.riskScore}`);
+            
+            // Quarantine the file
+            await quarantineService.quarantineFile(tempFilePath, analysis, {
+                userId,
+                username: username || 'anonymous',
+                ipAddress,
+                roomPin: roomPin || 'general',
+                originalName: req.file.originalname,
+                fileType: req.file.mimetype
+            });
+            
+            // Delete temporary file
+            await safeDeleteFile(tempFilePath);
+            
             return res.status(403).json({
-                error: 'File rejected: Potential steganography or hidden data detected',
+                error: 'File rejected: Security analysis failed',
+                severity: analysis.severity,
+                riskScore: analysis.riskScore,
                 details: {
+                    riskFactors: analysis.riskFactors,
+                    recommendation: securityReport.recommendation,
                     entropy: analysis.entropy,
-                    reason: analysis.lsbAnalysis?.reason || analysis.channelAnalysis?.reason || 'Suspicious patterns detected'
+                    fileHash: analysis.fileHash
                 }
             });
         }
         
         // File passed security checks, upload to Cloudinary
-        console.log('File passed security checks, uploading to Cloudinary...');
+        console.log(`[SECURITY] File approved: ${req.file.originalname}`);
         
         const uploadResult = await cloudinary.uploader.upload(tempFilePath, {
             folder: 'chat-images',
@@ -136,7 +377,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         });
         
         // Delete temporary file
-        await fs.unlink(tempFilePath);
+        await safeDeleteFile(tempFilePath);
         
         res.json({
             success: true,
@@ -144,17 +385,20 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             publicId: uploadResult.public_id,
             securityCheck: {
                 passed: true,
-                entropy: analysis.entropy
+                riskScore: analysis.riskScore || 0,
+                entropy: analysis.entropy,
+                fileHash: analysis.fileHash,
+                timestamp: new Date()
             }
         });
         
     } catch (error) {
-        console.error('Error uploading file:', error);
+        console.error('[ERROR] Error uploading file:', error);
         
         // Clean up temporary file
         if (tempFilePath) {
             try {
-                await fs.unlink(tempFilePath);
+                await safeDeleteFile(tempFilePath);
             } catch (unlinkError) {
                 console.error('Error deleting temp file:', unlinkError);
             }
@@ -183,7 +427,7 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
         });
         
         if (analysisResult.success && analysisResult.result.suspicious) {
-            await fs.unlink(tempFilePath);
+            await safeDeleteFile(tempFilePath);
             return res.status(403).json({
                 error: 'Image rejected due to security concerns'
             });
@@ -194,7 +438,7 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
             folder: 'chat-images'
         });
         
-        await fs.unlink(tempFilePath);
+        await safeDeleteFile(tempFilePath);
         
         res.json({ imageUrl: uploadResult.secure_url });
         
@@ -203,7 +447,7 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
         
         if (tempFilePath) {
             try {
-                await fs.unlink(tempFilePath);
+                await safeDeleteFile(tempFilePath);
             } catch (unlinkError) {
                 console.error('Error deleting temp file:', unlinkError);
             }

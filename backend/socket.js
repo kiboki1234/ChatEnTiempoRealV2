@@ -406,13 +406,21 @@ module.exports = (server) => {
             }
         });
 
-        socket.on('sendMessage', async (data) => {
+        socket.on('sendMessage', async (data, callback) => {
             try {
                 const roomPin = data.roomPin || socketRooms.get(socket.id) || 'general';
                 const ipAddress = normalizeIP(socket.handshake.address);  // ✅ Normalizar IP
+                
+                console.log(`[MESSAGE] Recibiendo mensaje para sala: ${roomPin}`, {
+                    username: data.username,
+                    hasImage: !!data.imageUrl,
+                    hasText: !!data.message
+                });
 
                 // Save message (already sanitized by worker if needed)
                 const message = await createMessage({ ...data, roomPin });
+                
+                console.log(`[MESSAGE] Mensaje guardado con ID: ${message._id}, emitiendo a sala: ${roomPin}`);
 
                 // Emit to room
                 io.to(roomPin).emit('receiveMessage', message);
@@ -431,9 +439,21 @@ module.exports = (server) => {
                         hasSticker: !!data.sticker
                     }
                 });
+                
+                console.log(`[MESSAGE] ✅ Mensaje procesado correctamente`);
+                
+                // Call callback to confirm success
+                if (callback) {
+                    callback({ success: true, message });
+                }
             } catch (error) {
-                console.error('Error sending message:', error);
+                console.error('[MESSAGE] ❌ Error sending message:', error);
                 socket.emit('messageError', { message: 'Error al enviar mensaje' });
+                
+                // Call callback with error
+                if (callback) {
+                    callback({ success: false, error: error.message });
+                }
             }
         });
 
