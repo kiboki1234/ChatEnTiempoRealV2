@@ -105,62 +105,9 @@ module.exports = (server) => {
             const isGuest = username.startsWith('guest_');
             const isRegistered = !isGuest;
 
-            // ✅ BUSCAR sesiones activas desde esta IP
-            const anySessionFromIP = await Session.findOne({
-                ipAddress,
-                isActive: true,
-                socketId: { $ne: socketId }
-            });
-
-            if (anySessionFromIP) {
-                const existingIsGuest = anySessionFromIP.username.startsWith('guest_');
-                const existingIsRegistered = !existingIsGuest;
-
-                // ══════════════════════════════════════════════════════
-                // CASO 1: MISMO USUARIO (reconexión)
-                // ══════════════════════════════════════════════════════
-                if (anySessionFromIP.username === username) {
-                    console.log(`🔄 Reconexión: ${username} desde ${ipAddress}`);
-                    anySessionFromIP.isActive = false;
-                    await anySessionFromIP.save();
-                    return { allowed: true, reconnection: true };
-                }
-
-                // ══════════════════════════════════════════════════════
-                // CASO 2: HAY USUARIO REGISTRADO ACTIVO
-                // ══════════════════════════════════════════════════════
-                if (existingIsRegistered) {
-                    console.log(`❌ IP bloqueada: Usuario registrado "${anySessionFromIP.username}" ya está activo`);
-                    return {
-                        allowed: false,
-                        reason: `Ya hay un usuario registrado activo ("${anySessionFromIP.username}"). Cierra esa sesión primero.`
-                    };
-                }
-
-                // ══════════════════════════════════════════════════════
-                // CASO 3: HAY INVITADO ACTIVO
-                // ══════════════════════════════════════════════════════
-                if (existingIsGuest) {
-                    // Si el nuevo también es invitado = BLOQUEAR (solo 1 invitado por IP)
-                    if (isGuest) {
-                        console.log(`❌ IP bloqueada: Invitado "${anySessionFromIP.username}" ya está activo`);
-                        return {
-                            allowed: false,
-                            reason: `Ya hay un invitado activo desde este dispositivo ("${anySessionFromIP.username}"). Solo se permite un usuario invitado por dispositivo.`
-                        };
-                    }
-
-                    // Si el nuevo es REGISTRADO = PERMITIR (cierra invitado automáticamente)
-                    if (isRegistered) {
-                        console.log(`✅ Usuario registrado "${username}" reemplaza invitado "${anySessionFromIP.username}"`);
-                        anySessionFromIP.isActive = false;
-                        await anySessionFromIP.save();
-                        return { allowed: true, replacedGuest: true };
-                    }
-                }
-            }
-
-            // ✅ REGLA FINAL: Verificar que el usuario no esté en otra IP
+            // ══════════════════════════════════════════════════════
+            // CASO 1: VERIFICAR SI EL MISMO USUARIO YA ESTÁ ACTIVO EN OTRA IP
+            // ══════════════════════════════════════════════════════
             const sameUserDifferentIP = await Session.findOne({
                 username,
                 ipAddress: { $ne: ipAddress },
@@ -172,10 +119,67 @@ module.exports = (server) => {
                 console.log(`❌ Usuario "${username}" ya está activo desde ${sameUserDifferentIP.ipAddress}`);
                 return {
                     allowed: false,
-                    reason: `El usuario "${username}" ya tiene una sesión activa desde otra ubicación.`
+                    reason: `El usuario "${username}" ya tiene una sesión activa desde otra ubicación (IP: ${sameUserDifferentIP.ipAddress}). Cierra esa sesión primero.`
                 };
             }
 
+            // ══════════════════════════════════════════════════════
+            // CASO 2: VERIFICAR SI EL MISMO USUARIO YA ESTÁ ACTIVO EN LA MISMA IP (reconexión)
+            // ══════════════════════════════════════════════════════
+            const sameUserSameIP = await Session.findOne({
+                username,
+                ipAddress,
+                isActive: true,
+                socketId: { $ne: socketId }
+            });
+
+            if (sameUserSameIP) {
+                console.log(`🔄 Reconexión: ${username} desde ${ipAddress}, cerrando sesión anterior`);
+                sameUserSameIP.isActive = false;
+                await sameUserSameIP.save();
+                return { allowed: true, reconnection: true };
+            }
+
+            // ══════════════════════════════════════════════════════
+            // CASO 3: CONTROL DE INVITADOS - Solo 1 invitado por IP
+            // ══════════════════════════════════════════════════════
+            if (isGuest) {
+                const guestSessionFromIP = await Session.findOne({
+                    username: { $regex: /^guest_/ },
+                    ipAddress,
+                    isActive: true,
+                    socketId: { $ne: socketId }
+                });
+
+                if (guestSessionFromIP) {
+                    console.log(`❌ IP bloqueada: Invitado "${guestSessionFromIP.username}" ya está activo`);
+                    return {
+                        allowed: false,
+                        reason: `Ya hay un invitado activo desde este dispositivo ("${guestSessionFromIP.username}"). Solo se permite un usuario invitado por dispositivo.`
+                    };
+                }
+            }
+
+            // ══════════════════════════════════════════════════════
+            // CASO 4: USUARIO REGISTRADO REEMPLAZA INVITADO DE LA MISMA IP
+            // ══════════════════════════════════════════════════════
+            if (isRegistered) {
+                const guestSessionFromIP = await Session.findOne({
+                    username: { $regex: /^guest_/ },
+                    ipAddress,
+                    isActive: true,
+                    socketId: { $ne: socketId }
+                });
+
+                if (guestSessionFromIP) {
+                    console.log(`✅ Usuario registrado "${username}" reemplaza invitado "${guestSessionFromIP.username}"`);
+                    guestSessionFromIP.isActive = false;
+                    await guestSessionFromIP.save();
+                    return { allowed: true, replacedGuest: true };
+                }
+            }
+
+            // ✅ PERMITIR: No hay conflictos
             return { allowed: true };
         } catch (error) {
             console.error('Error checking user session:', error);
