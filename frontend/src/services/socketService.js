@@ -2,7 +2,7 @@
 import { io } from 'socket.io-client';
 
 // Socket.IO uses HTTP protocol, not WebSocket directly
-const socketServerUrl = process.env.REACT_APP_SOCKET_SERVER_URL || 'http://localhost:5000';
+const socketServerUrl = process.env.REACT_APP_SOCKET_SERVER_URL || 'https://chatentiemporealv2.onrender.com';
 
 console.log('Connecting to socket server at:', socketServerUrl);
 

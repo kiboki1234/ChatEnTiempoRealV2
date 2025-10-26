@@ -12,7 +12,7 @@ const TwoFactorSetup = ({ token, onClose, onUpdate, userRole }) => {
     const [loading, setLoading] = useState(false);
     const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
 
-    const API_URL = process.env.REACT_APP_SOCKET_SERVER_URL || 'http://localhost:5000';
+    const API_URL = process.env.REACT_APP_SOCKET_SERVER_URL || 'https://chatentiemporealv2.onrender.com';
     
     // Determinar la ruta base según el rol del usuario
     const getBaseRoute = () => {

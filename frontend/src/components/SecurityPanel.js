@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import '../styles/SecurityPanel.css';
 
 const SecurityPanel = () => {
+    const API_URL = process.env.REACT_APP_SOCKET_SERVER_URL || 'https://chatentiemporealv2.onrender.com';
     const [statistics, setStatistics] = useState(null);
     const [quarantinedFiles, setQuarantinedFiles] = useState([]);
     const [alerts, setAlerts] = useState([]);
@@ -34,7 +35,7 @@ const SecurityPanel = () => {
     const loadStatistics = async () => {
         try {
             const token = localStorage.getItem('adminToken');
-            const response = await fetch('http://localhost:5000/api/security/statistics?days=7', {
+            const response = await fetch(`${API_URL}/api/security/statistics?days=7`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -52,7 +53,7 @@ const SecurityPanel = () => {
     const loadQuarantinedFiles = async () => {
         try {
             const token = localStorage.getItem('adminToken');
-            const response = await fetch('http://localhost:5000/api/security/quarantine', {
+            const response = await fetch(`${API_URL}/api/security/quarantine`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -70,7 +71,7 @@ const SecurityPanel = () => {
     const loadAlerts = async () => {
         try {
             const token = localStorage.getItem('adminToken');
-            const response = await fetch('http://localhost:5000/api/security/alerts?limit=20', {
+            const response = await fetch(`${API_URL}/api/security/alerts?limit=20`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -88,7 +89,7 @@ const SecurityPanel = () => {
     const viewFileDetails = async (fileName) => {
         try {
             const token = localStorage.getItem('adminToken');
-            const response = await fetch(`http://localhost:5000/api/security/quarantine/${fileName}`, {
+            const response = await fetch(`${API_URL}/api/security/quarantine/${fileName}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -110,7 +111,7 @@ const SecurityPanel = () => {
 
         try {
             const token = localStorage.getItem('adminToken');
-            const response = await fetch(`http://localhost:5000/api/security/quarantine/${fileName}`, {
+            const response = await fetch(`${API_URL}/api/security/quarantine/${fileName}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -137,7 +138,7 @@ const SecurityPanel = () => {
 
         try {
             const token = localStorage.getItem('adminToken');
-            const response = await fetch('http://localhost:5000/api/security/quarantine/clean', {
+            const response = await fetch(`${API_URL}/api/security/quarantine/clean`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,

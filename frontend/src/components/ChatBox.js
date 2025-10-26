@@ -231,7 +231,7 @@ const ChatBox = ({ initialRoomPin }) => {
             try {
                 socket.emit('leaveRoom');
                 // Redirigir a la página principal usando la URL base del .env
-                window.location.href = process.env.REACT_APP_BASE_URL || 'http://localhost:3000';
+                window.location.href = process.env.REACT_APP_BASE_URL || 'https://chat-en-tiempo-real-v2.vercel.app';
             } catch (error) {
                 setError('Error al salir de la sala. Por favor, inténtalo de nuevo.');
                 setTimeout(() => setError(''), 5000);

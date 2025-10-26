@@ -11,7 +11,7 @@ function AdminPanel({ userToken, userRole, onClose }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    const API_URL = process.env.REACT_APP_SOCKET_SERVER_URL || 'http://localhost:5000';
+    const API_URL = process.env.REACT_APP_SOCKET_SERVER_URL || 'https://chatentiemporealv2.onrender.com';
     const isGuest = localStorage.getItem('isGuest') === 'true';
 
     useEffect(() => {

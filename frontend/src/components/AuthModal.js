@@ -18,7 +18,7 @@ const AuthModal = ({ onAuthSuccess, onClose }) => {
 
         try {
             const endpoint = isLogin ? '/api/user-auth/login' : '/api/user-auth/register';
-            const apiUrl = process.env.REACT_APP_SOCKET_SERVER_URL || 'http://localhost:5000';
+            const apiUrl = process.env.REACT_APP_SOCKET_SERVER_URL || 'https://chatentiemporealv2.onrender.com';
 
             const requestBody = { username, password };
             
