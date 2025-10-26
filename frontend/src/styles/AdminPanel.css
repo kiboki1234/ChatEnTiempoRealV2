@@ -1,0 +1,247 @@
+/* AdminPanel.css */
+
+.admin-panel-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    animation: fadeIn 0.3s ease;
+}
+
+.admin-panel-container {
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 700px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease;
+}
+
+.admin-panel-container h2 {
+    margin: 0 0 24px 0;
+    color: #333;
+    font-size: 28px;
+    text-align: center;
+}
+
+.admin-panel-container h3 {
+    margin: 0 0 20px 0;
+    color: #444;
+    font-size: 22px;
+}
+
+.admin-panel-container h4 {
+    margin: 0 0 8px 0;
+    color: #333;
+    font-size: 18px;
+}
+
+/* Tabs */
+.admin-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.admin-tabs .tab {
+    background: none;
+    border: none;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #666;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+    position: relative;
+    bottom: -2px;
+}
+
+.admin-tabs .tab:hover {
+    color: #333;
+}
+
+.admin-tabs .tab.active {
+    color: #4caf50;
+    border-bottom-color: #4caf50;
+}
+
+/* Content */
+.admin-content {
+    min-height: 300px;
+}
+
+/* Security Section */
+.security-section {
+    animation: fadeIn 0.3s ease;
+}
+
+.security-option {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    transition: all 0.2s;
+}
+
+.security-option:hover {
+    background: #f0f0f0;
+    transform: translateX(4px);
+}
+
+.option-info {
+    flex: 1;
+}
+
+.option-info p {
+    color: #666;
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* Status badges */
+.status-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 8px;
+}
+
+.status-badge.enabled {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-badge.disabled {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.status-loading {
+    color: #666;
+    font-size: 13px;
+    font-style: italic;
+    margin-top: 8px;
+}
+
+.config-button {
+    background: #4caf50;
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.config-button:hover {
+    background: #45a049;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+/* Settings Section */
+.settings-section,
+.stats-section {
+    text-align: center;
+    padding: 60px 20px;
+    color: #999;
+    animation: fadeIn 0.3s ease;
+}
+
+/* Dark Mode */
+body.dark-mode .admin-panel-container {
+    background: #2a2a2a;
+    color: #e0e0e0;
+}
+
+body.dark-mode .admin-panel-container h2,
+body.dark-mode .admin-panel-container h3,
+body.dark-mode .admin-panel-container h4 {
+    color: #e0e0e0;
+}
+
+body.dark-mode .admin-tabs {
+    border-bottom-color: #444;
+}
+
+body.dark-mode .admin-tabs .tab {
+    color: #999;
+}
+
+body.dark-mode .admin-tabs .tab:hover {
+    color: #e0e0e0;
+}
+
+body.dark-mode .security-option {
+    background: #333;
+}
+
+body.dark-mode .security-option:hover {
+    background: #3a3a3a;
+}
+
+body.dark-mode .option-info p {
+    color: #aaa;
+}
+
+body.dark-mode .status-badge.enabled {
+    background: #1e4620;
+    color: #90ee90;
+    border-color: #2d5a2e;
+}
+
+body.dark-mode .status-badge.disabled {
+    background: #4a3f1a;
+    color: #ffd966;
+    border-color: #5c4d20;
+}
+
+body.dark-mode .status-loading {
+    color: #999;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .admin-panel-container {
+        padding: 24px 16px;
+        max-width: 95%;
+    }
+
+    .admin-tabs .tab {
+        padding: 10px 16px;
+        font-size: 14px;
+    }
+
+    .security-option {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .config-button {
+        width: 100%;
+    }
+}

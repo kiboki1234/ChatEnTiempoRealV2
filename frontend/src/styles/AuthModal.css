@@ -47,25 +47,7 @@
     }
 }
 
-.close-button {
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    width: 35px;
-    height: 35px;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 20px;
-    transition: all 0.3s ease;
-}
-
-.close-button:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: rotate(90deg);
-}
+/* Botón de cerrar removido por seguridad - no permitir cerrar sin autenticar */
 
 .auth-modal h2 {
     margin: 0 0 25px 0;
@@ -105,6 +87,50 @@
     outline: none;
     border-color: rgba(255, 255, 255, 0.6);
     background: rgba(255, 255, 255, 0.2);
+}
+
+.form-group input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* 2FA Input Styles */
+.two-factor-required {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-radius: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    animation: slideIn 0.4s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.two-factor-info {
+    background: rgba(76, 175, 80, 0.3);
+    border: 1px solid rgba(76, 175, 80, 0.5);
+    border-radius: 8px;
+    padding: 10px 15px;
+    margin-bottom: 15px;
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.two-factor-input {
+    font-size: 28px !important;
+    text-align: center !important;
+    letter-spacing: 8px !important;
+    font-family: 'Courier New', monospace !important;
+    font-weight: bold !important;
 }
 
 .form-group small {

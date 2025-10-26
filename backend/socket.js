@@ -51,6 +51,23 @@ module.exports = (server) => {
         return room;
     };
 
+    // Normalize IP address to handle IPv4/IPv6 variations
+    const normalizeIP = (ip) => {
+        if (!ip) return 'unknown';
+        
+        // Convert IPv6 localhost to standard format
+        if (ip === '::1' || ip === '::ffff:127.0.0.1' || ip === '127.0.0.1') {
+            return 'localhost';
+        }
+        
+        // Remove IPv6 prefix for IPv4-mapped addresses
+        if (ip.startsWith('::ffff:')) {
+            return ip.substring(7);
+        }
+        
+        return ip;
+    };
+
     // Generate device fingerprint from socket handshake
     const generateDeviceFingerprint = (socket) => {
         const data = {
@@ -66,29 +83,80 @@ module.exports = (server) => {
             .substring(0, 32);
     };
 
-    // Check if user can join (single session per device)
+    // Check if user can join (smart session control: registered users vs guests)
     const canUserJoin = async (username, ipAddress, deviceFingerprint, socketId) => {
         try {
-            // Check for existing active session
-            const existingSession = await Session.findOne({
-                username,
+            const isGuest = username.startsWith('guest_');
+            const isRegistered = !isGuest;
+
+            // ✅ BUSCAR sesiones activas desde esta IP
+            const anySessionFromIP = await Session.findOne({
+                ipAddress,
                 isActive: true,
                 socketId: { $ne: socketId }
             });
 
-            if (existingSession) {
-                // Check if it's the same device
-                if (existingSession.ipAddress === ipAddress && 
-                    existingSession.deviceFingerprint === deviceFingerprint) {
-                    // Same device, allow reconnection
-                    existingSession.isActive = false;
-                    await existingSession.save();
-                    return { allowed: true };
+            if (anySessionFromIP) {
+                const existingIsGuest = anySessionFromIP.username.startsWith('guest_');
+                const existingIsRegistered = !existingIsGuest;
+
+                // ══════════════════════════════════════════════════════
+                // CASO 1: MISMO USUARIO (reconexión)
+                // ══════════════════════════════════════════════════════
+                if (anySessionFromIP.username === username) {
+                    console.log(`🔄 Reconexión: ${username} desde ${ipAddress}`);
+                    anySessionFromIP.isActive = false;
+                    await anySessionFromIP.save();
+                    return { allowed: true, reconnection: true };
                 }
-                
+
+                // ══════════════════════════════════════════════════════
+                // CASO 2: HAY USUARIO REGISTRADO ACTIVO
+                // ══════════════════════════════════════════════════════
+                if (existingIsRegistered) {
+                    console.log(`❌ IP bloqueada: Usuario registrado "${anySessionFromIP.username}" ya está activo`);
+                    return {
+                        allowed: false,
+                        reason: `Ya hay un usuario registrado activo ("${anySessionFromIP.username}"). Cierra esa sesión primero.`
+                    };
+                }
+
+                // ══════════════════════════════════════════════════════
+                // CASO 3: HAY INVITADO ACTIVO
+                // ══════════════════════════════════════════════════════
+                if (existingIsGuest) {
+                    // Si el nuevo también es invitado = BLOQUEAR (solo 1 invitado por IP)
+                    if (isGuest) {
+                        console.log(`❌ IP bloqueada: Invitado "${anySessionFromIP.username}" ya está activo`);
+                        return {
+                            allowed: false,
+                            reason: `Ya hay un invitado activo desde este dispositivo ("${anySessionFromIP.username}"). Solo se permite un usuario invitado por dispositivo.`
+                        };
+                    }
+
+                    // Si el nuevo es REGISTRADO = PERMITIR (cierra invitado automáticamente)
+                    if (isRegistered) {
+                        console.log(`✅ Usuario registrado "${username}" reemplaza invitado "${anySessionFromIP.username}"`);
+                        anySessionFromIP.isActive = false;
+                        await anySessionFromIP.save();
+                        return { allowed: true, replacedGuest: true };
+                    }
+                }
+            }
+
+            // ✅ REGLA FINAL: Verificar que el usuario no esté en otra IP
+            const sameUserDifferentIP = await Session.findOne({
+                username,
+                ipAddress: { $ne: ipAddress },
+                isActive: true,
+                socketId: { $ne: socketId }
+            });
+
+            if (sameUserDifferentIP) {
+                console.log(`❌ Usuario "${username}" ya está activo desde ${sameUserDifferentIP.ipAddress}`);
                 return {
                     allowed: false,
-                    reason: 'You already have an active session on another device'
+                    reason: `El usuario "${username}" ya tiene una sesión activa desde otra ubicación.`
                 };
             }
 
@@ -100,8 +168,15 @@ module.exports = (server) => {
     };
 
     const joinRoom = async (socket, pin, username) => {
-        const ipAddress = socket.handshake.address;
+        const rawIP = socket.handshake.address;
+        const ipAddress = normalizeIP(rawIP);  // ✅ Normalizar IP
         const deviceFingerprint = generateDeviceFingerprint(socket);
+
+        // ✅ VALIDACIÓN DE SESIÓN ÚNICA (PARA TODAS LAS SALAS, INCLUYENDO GENERAL)
+        const sessionCheck = await canUserJoin(username, ipAddress, deviceFingerprint, socket.id);
+        if (!sessionCheck.allowed) {
+            throw new Error(sessionCheck.reason);
+        }
 
         if (pin === 'general') {
             socket.join('general');
@@ -115,7 +190,9 @@ module.exports = (server) => {
                     socketId: socket.id,
                     ipAddress,
                     deviceFingerprint,
-                    roomPin: 'general'
+                    roomPin: 'general',
+                    isActive: true,
+                    lastActivity: new Date()
                 },
                 { upsert: true, new: true }
             );
@@ -139,11 +216,7 @@ module.exports = (server) => {
             throw new Error('La sala ha expirado');
         }
 
-        // Check single session
-        const sessionCheck = await canUserJoin(username, ipAddress, deviceFingerprint, socket.id);
-        if (!sessionCheck.allowed) {
-            throw new Error(sessionCheck.reason);
-        }
+        // Session check already done above (no need to repeat)
 
         const alreadyInRoom = room.participants.some(p => p.username === username);
         
@@ -212,7 +285,7 @@ module.exports = (server) => {
     const leaveRoom = async (socket) => {
         const pin = socket.roomPin;
         const username = socket.username;
-        const ipAddress = socket.handshake.address;
+        const ipAddress = normalizeIP(socket.handshake.address);  // ✅ Normalizar IP
 
         if (!pin) return;
 
@@ -336,7 +409,7 @@ module.exports = (server) => {
         socket.on('sendMessage', async (data) => {
             try {
                 const roomPin = data.roomPin || socketRooms.get(socket.id) || 'general';
-                const ipAddress = socket.handshake.address;
+                const ipAddress = normalizeIP(socket.handshake.address);  // ✅ Normalizar IP
 
                 // Save message (already sanitized by worker if needed)
                 const message = await createMessage({ ...data, roomPin });
@@ -366,7 +439,7 @@ module.exports = (server) => {
 
         socket.on('createRoom', async ({ name, maxParticipants, type, username }) => {
             try {
-                const ipAddress = socket.handshake.address;
+                const ipAddress = normalizeIP(socket.handshake.address);  // ✅ Normalizar IP
                 const deviceFingerprint = generateDeviceFingerprint(socket);
                 
                 // Check if user is a guest (guests cannot create rooms)
@@ -457,7 +530,7 @@ module.exports = (server) => {
                 // Check if user is the creator or admin
                 const user = await UserService.getOrCreateUser(
                     username, 
-                    socket.handshake.address, 
+                    normalizeIP(socket.handshake.address),  // ✅ Normalizar IP
                     generateDeviceFingerprint(socket)
                 );
                 
@@ -496,7 +569,7 @@ module.exports = (server) => {
                     action: 'CLOSE_ROOM',
                     userId: socket.id,
                     username,
-                    ipAddress: socket.handshake.address,
+                    ipAddress: normalizeIP(socket.handshake.address),  // ✅ Normalizar IP
                     roomPin: pin,
                     details: {
                         roomName: room.name,
@@ -551,7 +624,7 @@ module.exports = (server) => {
         socket.on('disconnect', async () => {
             const pin = socket.roomPin || socketRooms.get(socket.id);
             const username = socket.username || 'Desconocido';
-            const ipAddress = socket.handshake.address;
+            const ipAddress = normalizeIP(socket.handshake.address);  // ✅ Normalizar IP
 
             // Deactivate session
             const session = activeSessions.get(socket.id);

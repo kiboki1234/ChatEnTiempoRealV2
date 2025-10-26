@@ -6,7 +6,7 @@ const auditLogSchema = new mongoose.Schema({
         type: String,
         required: true,
         enum: ['LOGIN', 'LOGOUT', 'REGISTER', 'USER_AUTO_REGISTER', 'CREATE_ROOM', 'DELETE_ROOM', 'JOIN_ROOM', 'LEAVE_ROOM', 
-               'SEND_MESSAGE', 'UPLOAD_FILE', 'FILE_REJECTED', 'ADMIN_ACTION', 'SECURITY_ALERT']
+               'SEND_MESSAGE', 'UPLOAD_FILE', 'FILE_REJECTED', 'ADMIN_ACTION', 'SECURITY_ALERT', 'SETUP_2FA', 'ENABLE_2FA', 'DISABLE_2FA']
     },
     userId: {
         type: String,

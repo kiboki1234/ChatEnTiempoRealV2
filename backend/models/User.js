@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
     username: {
@@ -9,10 +10,23 @@ const userSchema = new mongoose.Schema({
         minlength: 3,
         maxlength: 30
     },
+    password: {
+        type: String,
+        required: false // Opcional para usuarios que solo usan el sistema de chat
+    },
     role: {
         type: String,
         enum: ['user', 'admin'],
         default: 'user'
+    },
+    // 2FA fields
+    twoFactorSecret: {
+        type: String,
+        default: null
+    },
+    twoFactorEnabled: {
+        type: Boolean,
+        default: false
     },
     // Track active rooms created by this user
     activeRooms: [{
@@ -149,6 +163,31 @@ userSchema.methods.removeActiveRoom = function(roomId) {
     );
     this.decrementActiveRooms();
 };
+
+// Password methods
+userSchema.methods.comparePassword = async function(candidatePassword) {
+    // Si no hay contraseña guardada, no se puede comparar
+    if (!this.password) {
+        return false;
+    }
+    return await bcrypt.compare(candidatePassword, this.password);
+};
+
+// Hash password before saving
+userSchema.pre('save', async function(next) {
+    // Solo hashear la contraseña si ha sido modificada (o es nueva)
+    if (!this.isModified('password') || !this.password) {
+        return next();
+    }
+    
+    try {
+        const salt = await bcrypt.genSalt(10);
+        this.password = await bcrypt.hash(this.password, salt);
+        next();
+    } catch (error) {
+        next(error);
+    }
+});
 
 // Static methods
 userSchema.statics.findOrCreateByUsername = async function(username, ipAddress, deviceFingerprint) {

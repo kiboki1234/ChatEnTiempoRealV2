@@ -1,8 +1,8 @@
 const jwt = require('jsonwebtoken');
-const Admin = require('../models/Admin');
+const User = require('../models/User');
 
-// Middleware to verify JWT token
-const authenticateAdmin = async (req, res, next) => {
+// Middleware to verify JWT token for any authenticated user
+const authenticateUser = async (req, res, next) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
         
@@ -15,16 +15,16 @@ const authenticateAdmin = async (req, res, next) => {
             process.env.JWT_SECRET || 'default-jwt-secret-change-in-production'
         );
         
-        const admin = await Admin.findById(decoded.adminId).select('-password -twoFactorSecret');
+        const user = await User.findById(decoded.userId).select('-password -twoFactorSecret');
         
-        if (!admin || !admin.isActive) {
-            return res.status(401).json({ error: 'Invalid token or inactive admin' });
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid token or user not found' });
         }
         
-        req.adminId = decoded.adminId;
+        req.userId = decoded.userId;
         req.username = decoded.username;
-        req.isAdmin = decoded.isAdmin;
-        req.admin = admin;
+        req.userRole = user.role;
+        req.user = user;
         
         next();
     } catch (error) {
@@ -35,15 +35,19 @@ const authenticateAdmin = async (req, res, next) => {
     }
 };
 
+// Legacy middleware - mantener compatibilidad con código antiguo
+const authenticateAdmin = authenticateUser;
+
 // Middleware to check if user is admin
 const requireAdmin = (req, res, next) => {
-    if (!req.isAdmin) {
+    if (req.userRole !== 'admin') {
         return res.status(403).json({ error: 'Admin access required' });
     }
     next();
 };
 
 module.exports = {
+    authenticateUser,
     authenticateAdmin,
     requireAdmin
 };

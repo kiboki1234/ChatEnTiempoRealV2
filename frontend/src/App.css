@@ -597,6 +597,30 @@ body.dark-mode .leave-room-button:hover {
     margin-bottom: 10px;
 }
 
+.header-buttons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.admin-settings-button {
+    background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}
+
+.admin-settings-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.5);
+}
+
 .logout-button {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -633,6 +657,14 @@ body.dark-mode .leave-room-button:hover {
     font-size: 0.75rem;
     font-weight: bold;
     margin-left: 10px;
+}
+
+body.dark-mode .admin-settings-button {
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.5);
+}
+
+body.dark-mode .admin-settings-button:hover {
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.7);
 }
 
 body.dark-mode .logout-button {

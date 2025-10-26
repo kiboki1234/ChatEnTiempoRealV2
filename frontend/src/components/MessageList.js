@@ -93,9 +93,9 @@ const MessageList = ({ messages = [], onReply, username }) => {
                 {urls ? (
                     <div>
                         <Linkify>{msg.message}</Linkify>
-                        {urls.map((url, index) => (
+                        {urls.map((url) => (
                             previews[url] ? (
-                                <div key={index} className="link-preview-container">
+                                <div key={url} className="link-preview-container">
                                     {previews[url].image && (
                                         <img
                                             src={previews[url].image}
@@ -115,7 +115,7 @@ const MessageList = ({ messages = [], onReply, username }) => {
                                     </a>
                                 </div>
                             ) : (
-                                <a key={index} href={url} target="_blank" rel="noopener noreferrer">
+                                <a key={url} href={url} target="_blank" rel="noopener noreferrer">
                                     {url}
                                 </a>
                             )

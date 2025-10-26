@@ -1,4 +1,4 @@
-const Admin = require('../models/Admin');
+const User = require('../models/User');
 const AuditLog = require('../models/AuditLog');
 const jwt = require('jsonwebtoken');
 const speakeasy = require('speakeasy');
@@ -8,25 +8,26 @@ const registerAdmin = async (req, res) => {
     try {
         const { username, password, email } = req.body;
         
-        // Check if admin already exists
-        const existingAdmin = await Admin.findOne({ $or: [{ username }, { email }] });
-        if (existingAdmin) {
-            return res.status(400).json({ error: 'Admin already exists' });
+        // Check if user already exists
+        const existingUser = await User.findOne({ $or: [{ username }, { email }] });
+        if (existingUser) {
+            return res.status(400).json({ error: 'User already exists' });
         }
         
-        const admin = new Admin({
+        const user = new User({
             username,
             password,
-            email
+            email,
+            role: 'admin' // Crear como admin
         });
         
-        await admin.save();
+        await user.save();
         
         // Create audit log
         await AuditLog.create({
             action: 'ADMIN_ACTION',
-            userId: admin._id.toString(),
-            username: admin.username,
+            userId: user._id.toString(),
+            username: user.username,
             ipAddress: req.ip || req.connection.remoteAddress,
             userAgent: req.headers['user-agent'],
             details: { action: 'REGISTER' }
@@ -34,7 +35,7 @@ const registerAdmin = async (req, res) => {
         
         res.status(201).json({ 
             message: 'Admin registered successfully',
-            adminId: admin._id 
+            userId: user._id 
         });
     } catch (error) {
         console.error('Error registering admin:', error);
@@ -47,71 +48,84 @@ const loginAdmin = async (req, res) => {
     try {
         const { username, password, twoFactorCode } = req.body;
         
-        // Find admin
-        const admin = await Admin.findOne({ username, isActive: true });
-        if (!admin) {
+        console.log('🔐 Login attempt:', { username, has2FACode: !!twoFactorCode });
+        
+        // Find user
+        const user = await User.findOne({ username });
+        if (!user) {
+            console.log('❌ User not found:', username);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
+        
+        console.log('✅ User found:', { username, has2FA: user.twoFactorEnabled });
         
         // Check password
-        const isPasswordValid = await admin.comparePassword(password);
+        const isPasswordValid = await user.comparePassword(password);
         if (!isPasswordValid) {
+            console.log('❌ Invalid password for user:', username);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         
+        console.log('✅ Password valid');
+        
         // Check 2FA if enabled
-        if (admin.twoFactorEnabled) {
+        if (user.twoFactorEnabled) {
+            console.log('🔐 2FA is enabled for this user');
             if (!twoFactorCode) {
-                return res.status(401).json({ 
-                    error: '2FA code required',
-                    requires2FA: true 
+                console.log('⚠️ 2FA code not provided, requesting it...');
+                // Usuario tiene 2FA activo pero no envió el código
+                // Retornar 200 con requires2FA para que el frontend muestre el campo
+                return res.status(200).json({ 
+                    requires2FA: true,
+                    message: 'Por favor ingresa tu código de autenticación de dos factores'
                 });
             }
             
+            console.log('🔍 Verifying 2FA code...');
             const verified = speakeasy.totp.verify({
-                secret: admin.twoFactorSecret,
+                secret: user.twoFactorSecret,
                 encoding: 'base32',
                 token: twoFactorCode,
                 window: 2
             });
             
             if (!verified) {
-                return res.status(401).json({ error: 'Invalid 2FA code' });
+                console.log('❌ Invalid 2FA code');
+                return res.status(401).json({ 
+                    error: 'Código 2FA inválido. Por favor verifica e intenta nuevamente.' 
+                });
             }
+            console.log('✅ 2FA code verified successfully');
         }
-        
-        // Update last login
-        admin.lastLogin = new Date();
-        await admin.save();
         
         // Generate JWT
         const token = jwt.sign(
             { 
-                adminId: admin._id, 
-                username: admin.username,
-                isAdmin: true
+                userId: user._id, 
+                username: user.username,
+                role: user.role
             },
             process.env.JWT_SECRET || 'default-jwt-secret-change-in-production',
-            { expiresIn: '8h' }
+            { expiresIn: '30d' }
         );
         
         // Create audit log
         await AuditLog.create({
             action: 'LOGIN',
-            userId: admin._id.toString(),
-            username: admin.username,
+            userId: user._id.toString(),
+            username: user.username,
             ipAddress: req.ip || req.connection.remoteAddress,
             userAgent: req.headers['user-agent'],
-            details: { success: true, with2FA: admin.twoFactorEnabled }
+            details: { success: true, with2FA: user.twoFactorEnabled }
         });
         
         res.json({ 
             token,
-            admin: {
-                id: admin._id,
-                username: admin.username,
-                email: admin.email,
-                twoFactorEnabled: admin.twoFactorEnabled
+            user: {
+                id: user._id,
+                username: user.username,
+                role: user.role,
+                twoFactorEnabled: user.twoFactorEnabled
             }
         });
     } catch (error) {
@@ -123,24 +137,32 @@ const loginAdmin = async (req, res) => {
 // Setup 2FA
 const setup2FA = async (req, res) => {
     try {
-        const admin = await Admin.findById(req.adminId);
-        if (!admin) {
-            return res.status(404).json({ error: 'Admin not found' });
+        console.log('🔧 Setup 2FA - userId:', req.userId);
+        
+        const user = await User.findById(req.userId);
+        if (!user) {
+            console.error('❌ User not found:', req.userId);
+            return res.status(404).json({ error: 'User not found' });
         }
         
+        console.log('✅ User found:', user.username);
+        
         const secret = speakeasy.generateSecret({
-            name: `ChatApp:${admin.username}`
+            name: `ChatApp:${user.username}`
         });
         
-        admin.twoFactorSecret = secret.base32;
-        await admin.save();
+        user.twoFactorSecret = secret.base32;
+        await user.save();
+        
+        console.log('✅ Secret saved for user:', user.username);
+        console.log('📱 Secret:', secret.base32);
         
         res.json({
             secret: secret.base32,
             qrCode: secret.otpauth_url
         });
     } catch (error) {
-        console.error('Error setting up 2FA:', error);
+        console.error('❌ Error setting up 2FA:', error);
         res.status(500).json({ error: 'Error setting up 2FA' });
     }
 };
@@ -149,31 +171,47 @@ const setup2FA = async (req, res) => {
 const enable2FA = async (req, res) => {
     try {
         const { twoFactorCode } = req.body;
-        const admin = await Admin.findById(req.adminId);
+        console.log('🔐 Enable 2FA - userId:', req.userId);
+        console.log('🔐 Code received:', twoFactorCode);
         
-        if (!admin || !admin.twoFactorSecret) {
-            return res.status(400).json({ error: '2FA not set up' });
+        const user = await User.findById(req.userId);
+        
+        if (!user) {
+            console.error('❌ User not found:', req.userId);
+            return res.status(404).json({ error: 'User not found' });
         }
         
+        console.log('✅ User found:', user.username);
+        console.log('📱 Has secret:', !!user.twoFactorSecret);
+        console.log('📱 Secret value:', user.twoFactorSecret ? user.twoFactorSecret.substring(0, 8) + '...' : 'null');
+        
+        if (!user.twoFactorSecret) {
+            console.error('❌ 2FA not set up for user:', user.username);
+            return res.status(400).json({ error: '2FA not set up. Please scan the QR code first.' });
+        }
+        
+        console.log('🔍 Verifying code...');
         const verified = speakeasy.totp.verify({
-            secret: admin.twoFactorSecret,
+            secret: user.twoFactorSecret,
             encoding: 'base32',
             token: twoFactorCode,
             window: 2
         });
         
+        console.log('✅ Verification result:', verified);
+        
         if (!verified) {
             return res.status(401).json({ error: 'Invalid 2FA code' });
         }
         
-        admin.twoFactorEnabled = true;
-        await admin.save();
+        user.twoFactorEnabled = true;
+        await user.save();
         
         // Create audit log
         await AuditLog.create({
-            action: 'ADMIN_ACTION',
-            userId: admin._id.toString(),
-            username: admin.username,
+            action: 'ENABLE_2FA',
+            userId: user._id.toString(),
+            username: user.username,
             ipAddress: req.ip || req.connection.remoteAddress,
             userAgent: req.headers['user-agent'],
             details: { action: 'ENABLE_2FA' }
@@ -190,26 +228,26 @@ const enable2FA = async (req, res) => {
 const disable2FA = async (req, res) => {
     try {
         const { password } = req.body;
-        const admin = await Admin.findById(req.adminId);
+        const user = await User.findById(req.userId);
         
-        if (!admin) {
-            return res.status(404).json({ error: 'Admin not found' });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
         }
         
-        const isPasswordValid = await admin.comparePassword(password);
+        const isPasswordValid = await user.comparePassword(password);
         if (!isPasswordValid) {
             return res.status(401).json({ error: 'Invalid password' });
         }
         
-        admin.twoFactorEnabled = false;
-        admin.twoFactorSecret = null;
-        await admin.save();
+        user.twoFactorEnabled = false;
+        user.twoFactorSecret = null;
+        await user.save();
         
         // Create audit log
         await AuditLog.create({
-            action: 'ADMIN_ACTION',
-            userId: admin._id.toString(),
-            username: admin.username,
+            action: 'DISABLE_2FA',
+            userId: user._id.toString(),
+            username: user.username,
             ipAddress: req.ip || req.connection.remoteAddress,
             userAgent: req.headers['user-agent'],
             details: { action: 'DISABLE_2FA' }
@@ -225,12 +263,31 @@ const disable2FA = async (req, res) => {
 // Verify token
 const verifyToken = async (req, res) => {
     try {
-        const admin = await Admin.findById(req.adminId).select('-password -twoFactorSecret');
-        if (!admin) {
-            return res.status(404).json({ error: 'Admin not found' });
+        const user = await User.findById(req.userId).select('-password -twoFactorSecret');
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
         }
         
-        res.json({ admin });
+        // Asegurar que el campo twoFactorEnabled exista
+        if (user.twoFactorEnabled === undefined || user.twoFactorEnabled === null) {
+            user.twoFactorEnabled = false;
+            await user.save();
+        }
+        
+        console.log('✅ Admin verify endpoint - user data:', {
+            username: user.username,
+            twoFactorEnabled: user.twoFactorEnabled
+        });
+        
+        res.json({ 
+            user: {
+                id: user._id,
+                username: user.username,
+                role: user.role,
+                twoFactorEnabled: user.twoFactorEnabled,
+                stats: user.stats
+            }
+        });
     } catch (error) {
         console.error('Error verifying token:', error);
         res.status(500).json({ error: 'Error verifying token' });

@@ -5,6 +5,9 @@ const AuthModal = ({ onAuthSuccess, onClose }) => {
     const [isLogin, setIsLogin] = useState(true);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [twoFactorCode, setTwoFactorCode] = useState('');
+    const [requires2FA, setRequires2FA] = useState(false);
+    const [tempUserId, setTempUserId] = useState(null); // Para almacenar el ID temporalmente
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -17,21 +20,39 @@ const AuthModal = ({ onAuthSuccess, onClose }) => {
             const endpoint = isLogin ? '/api/user-auth/login' : '/api/user-auth/register';
             const apiUrl = process.env.REACT_APP_SOCKET_SERVER_URL || 'http://localhost:5000';
 
+            const requestBody = { username, password };
+            
+            // Si se requiere 2FA y estamos en login, agregar el código
+            if (requires2FA && isLogin) {
+                requestBody.twoFactorCode = twoFactorCode;
+            }
+
             const response = await fetch(`${apiUrl}${endpoint}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify(requestBody)
             });
 
             const data = await response.json();
+            console.log('🔐 Login response:', { status: response.status, data });
 
+            // Verificar si se requiere 2FA (ahora viene con status 200)
+            if (data.requires2FA && isLogin) {
+                console.log('⚠️ 2FA required, showing input field');
+                setRequires2FA(true);
+                setError('');
+                setLoading(false);
+                return;
+            }
+
+            // Si la respuesta no es OK y no es caso de 2FA, es un error
             if (!response.ok) {
                 throw new Error(data.error || 'Error en la autenticación');
             }
 
-            // Guardar token en localStorage
+            // Login exitoso - guardar datos
             localStorage.setItem('userToken', data.token);
             localStorage.setItem('username', data.user.username);
             localStorage.setItem('userRole', data.user.role);
@@ -67,7 +88,7 @@ const AuthModal = ({ onAuthSuccess, onClose }) => {
     return (
         <div className="auth-modal-overlay">
             <div className="auth-modal">
-                <button className="close-button" onClick={onClose}>✕</button>
+                {/* Botón de cerrar removido para evitar acceso sin autenticación */}
                 
                 <h2>{isLogin ? '🔐 Iniciar Sesión' : '✨ Crear Cuenta'}</h2>
                 
@@ -97,9 +118,32 @@ const AuthModal = ({ onAuthSuccess, onClose }) => {
                             placeholder={isLogin ? "Ingresa tu contraseña" : "Mínimo 6 caracteres"}
                             required={!isLogin}
                             minLength={isLogin ? 1 : 6}
+                            disabled={requires2FA}
+                            readOnly={requires2FA}
                         />
                         <small>{isLogin ? "Opcional para login rápido" : "Mínimo 6 caracteres"}</small>
                     </div>
+
+                    {requires2FA && isLogin && (
+                        <div className="form-group two-factor-required">
+                            <label>🔐 Código de Autenticación (2FA)</label>
+                            <div className="two-factor-info">
+                                ℹ️ Este usuario tiene activada la autenticación de dos factores
+                            </div>
+                            <input
+                                type="text"
+                                value={twoFactorCode}
+                                onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                placeholder="000000"
+                                maxLength={6}
+                                pattern="\d{6}"
+                                className="two-factor-input"
+                                autoFocus
+                                required
+                            />
+                            <small>Ingresa el código de 6 dígitos de tu app de autenticación</small>
+                        </div>
+                    )}
 
                     {error && <div className="error-message">{error}</div>}
 
@@ -133,6 +177,8 @@ const AuthModal = ({ onAuthSuccess, onClose }) => {
                                 onClick={() => {
                                     setIsLogin(false);
                                     setError('');
+                                    setRequires2FA(false);
+                                    setTwoFactorCode('');
                                 }}
                             >
                                 Regístrate aquí
@@ -146,6 +192,8 @@ const AuthModal = ({ onAuthSuccess, onClose }) => {
                                 onClick={() => {
                                     setIsLogin(true);
                                     setError('');
+                                    setRequires2FA(false);
+                                    setTwoFactorCode('');
                                 }}
                             >
                                 Inicia sesión

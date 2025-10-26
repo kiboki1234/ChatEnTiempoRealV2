@@ -10,8 +10,8 @@ const RoomParticipants = ({ participants, currentRoom }) => {
         <div className="room-participants-list">
             <h4>Participantes en la sala ({participants.length})</h4>
             <ul>
-                {participants.map((participant, index) => (
-                    <li key={index} className="participant-item">
+                {participants.map((participant) => (
+                    <li key={participant.username || participant.socketId || participant.id} className="participant-item">
                         <FaUser className="participant-icon" />
                         <span className="participant-name">{participant.username}</span>
                     </li>

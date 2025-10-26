@@ -6,6 +6,7 @@ import RoomManager from './RoomManager';
 import RoomParticipants from './RoomParticipants';
 import UserStats from './UserStats';
 import AuthModal from './AuthModal';
+import AdminPanel from './AdminPanel';
 import '../App.css';
 
 const ADS_ENABLED = false;
@@ -23,6 +24,7 @@ const ChatBox = ({ initialRoomPin }) => {
     // Add the missing participants state
     const [participants, setParticipants] = useState([]);
     const [error, setError] = useState(null);
+    const [showAdminPanel, setShowAdminPanel] = useState(false);
     // Add the missing darkMode state
     const [darkMode, setDarkMode] = useState(() => {
         return localStorage.getItem('darkMode') === 'true';
@@ -162,6 +164,39 @@ const ChatBox = ({ initialRoomPin }) => {
             console.error('Room error:', error.message);
             setError(error.message);
             setAutoJoining(false);
+            
+            // Si es error de sesión duplicada, forzar logout
+            if (error.message && (
+                error.message.includes('ya tiene una sesión activa') ||
+                error.message.includes('Ya hay un usuario') ||
+                error.message.includes('Ya hay un invitado') ||
+                error.message.includes('sesión activa desde este dispositivo')
+            )) {
+                console.log('🚫 Sesión bloqueada: cerrando conexión');
+                
+                // Desconectar socket
+                socket.disconnect();
+                
+                // Limpiar datos locales
+                localStorage.removeItem('userToken');
+                localStorage.removeItem('username');
+                localStorage.removeItem('userRole');
+                localStorage.removeItem('isGuest');
+                
+                // Resetear estados
+                setIsAuthenticated(false);
+                setUsername('');
+                setCurrentRoom('general');
+                setMessages([]);
+                
+                // Mostrar alerta bloqueante
+                alert(`❌ ACCESO BLOQUEADO\n\n${error.message}\n\nPor favor, cierra la otra sesión primero.`);
+                
+                // Recargar página después de 1 segundo
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            }
         });
 
         return () => {
@@ -221,11 +256,19 @@ const ChatBox = ({ initialRoomPin }) => {
 
     return (
         <div className="page-container">
-            {/* Auth Modal */}
+            {/* Auth Modal - No puede cerrarse sin autenticación */}
             {showAuthModal && (
                 <AuthModal 
                     onAuthSuccess={handleAuthSuccess}
-                    onClose={() => setShowAuthModal(false)}
+                />
+            )}
+
+            {/* Admin Panel Modal */}
+            {showAdminPanel && (
+                <AdminPanel
+                    userToken={localStorage.getItem('userToken')}
+                    userRole={userRole}
+                    onClose={() => setShowAdminPanel(false)}
                 />
             )}
             
@@ -246,9 +289,21 @@ const ChatBox = ({ initialRoomPin }) => {
                         <h1 className="chat-header">
                             {autoJoining ? 'Uniéndose a la sala...' : roomInfo.name}
                         </h1>
-                        <button className="logout-button" onClick={handleLogout} title="Cerrar sesión">
-                            🚪 Salir
-                        </button>
+                        <div className="header-buttons">
+                            {/* Todos los usuarios pueden acceder a configuración */}
+                            {!localStorage.getItem('isGuest') && (
+                                <button 
+                                    className="admin-settings-button" 
+                                    onClick={() => setShowAdminPanel(true)}
+                                    title="Configuración"
+                                >
+                                    ⚙️ Configuración
+                                </button>
+                            )}
+                            <button className="logout-button" onClick={handleLogout} title="Cerrar sesión">
+                                🚪 Salir
+                            </button>
+                        </div>
                     </div>
                     
                     <h2 className="chat-username">

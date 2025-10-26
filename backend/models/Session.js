@@ -45,7 +45,12 @@ const sessionSchema = new mongoose.Schema({
 });
 
 // Create compound index for efficient queries
-sessionSchema.index({ username: 1, ipAddress: 1, deviceFingerprint: 1 });
+// ✅ Índice principal: buscar sesiones activas por IP (nueva lógica: 1 cuenta por IP)
+sessionSchema.index({ ipAddress: 1, isActive: 1 });
+// ✅ Índice secundario: buscar por username + IP + estado
+sessionSchema.index({ username: 1, ipAddress: 1, isActive: 1 });
+// ✅ Índice para limpieza automática de sesiones expiradas
 sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// Nota: socketId ya tiene índice único automático por 'unique: true' en el schema
 
 module.exports = mongoose.model('Session', sessionSchema);

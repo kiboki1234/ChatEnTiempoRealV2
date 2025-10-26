@@ -31,7 +31,7 @@ Multimedia: mensajes más subida de archivos.
 
 En las salas multimedia, el sistema debe implementar detección automática de manipulaciones mediante esteganografía en los archivos subidos (p. ej., imágenes o documentos con datos ocultos) y verificar que no contengan adjuntos maliciosos o alteraciones no autorizadas, rechazando o alertando sobre archivos sospechosos. El sistema debe utilizar hilos (threads) para manejar la concurrencia en operaciones como autenticación, creación de salas, transmisión de mensajes y análisis de seguridad de archivos, asegurando escalabilidad, rendimiento sin bloqueos y procesamiento paralelo de verificaciones de integridad.
 
-Los usuarios solo podrán unirse a una sala a la vez desde un solo dispositivo (ordenador), verificado mediante un mecanismo de sesión única por IP o dispositivo. El proyecto debe priorizar la seguridad integral (autenticación multifactor opcional, encriptación end-to-end, auditoría de logs y validación de entradas), la usabilidad y la comunicación bidireccional en tiempo real.
+Los usuarios solo podrán unirse a una sala a la vez desde un solo dispositivo (ordenador), verificado mediante un mecanismo de sesión única por IP o dispositivo. El proyecto debe priorizar la seguridad integral (autenticación multifactor , encriptación end-to-end, auditoría de logs y validación de entradas), la usabilidad y la comunicación bidireccional en tiempo real.
 
 3. Requisitos
 3.1. Requisitos funcionales
