@@ -52,6 +52,34 @@ module.exports = (server) => {
         return room;
     };
 
+    // Get real IP address from socket, considering proxy headers
+    const getRealIP = (socket) => {
+        // Check for proxy headers first (most reliable in production)
+        const forwardedFor = socket.handshake.headers['x-forwarded-for'];
+        const realIP = socket.handshake.headers['x-real-ip'];
+        const cfConnectingIP = socket.handshake.headers['cf-connecting-ip']; // Cloudflare
+        
+        // x-forwarded-for can contain multiple IPs (client, proxy1, proxy2...)
+        // The first one is the real client IP
+        if (forwardedFor) {
+            const ips = forwardedFor.split(',').map(ip => ip.trim());
+            return normalizeIP(ips[0]);
+        }
+        
+        // x-real-ip is set by some proxies
+        if (realIP) {
+            return normalizeIP(realIP);
+        }
+        
+        // cf-connecting-ip is set by Cloudflare
+        if (cfConnectingIP) {
+            return normalizeIP(cfConnectingIP);
+        }
+        
+        // Fallback to socket address (direct connection or local development)
+        return normalizeIP(socket.handshake.address);
+    };
+
     // Normalize IP address to handle IPv4/IPv6 variations
     const normalizeIP = (ip) => {
         if (!ip) return 'unknown';
@@ -188,8 +216,7 @@ module.exports = (server) => {
     };
 
     const joinRoom = async (socket, pin, username) => {
-        const rawIP = socket.handshake.address;
-        const ipAddress = normalizeIP(rawIP);  // ✅ Normalizar IP
+        const ipAddress = getRealIP(socket);  // ✅ Obtener IP real considerando proxies
         const deviceFingerprint = await generateDeviceFingerprint(socket);
 
         // ✅ VALIDACIÓN DE SESIÓN ÚNICA (PARA TODAS LAS SALAS, INCLUYENDO GENERAL)
@@ -305,7 +332,7 @@ module.exports = (server) => {
     const leaveRoom = async (socket) => {
         const pin = socket.roomPin;
         const username = socket.username;
-        const ipAddress = normalizeIP(socket.handshake.address);  // ✅ Normalizar IP
+        const ipAddress = getRealIP(socket);  // ✅ Obtener IP real considerando proxies
 
         if (!pin) return;
 
@@ -429,7 +456,7 @@ module.exports = (server) => {
         socket.on('sendMessage', async (data, callback) => {
             try {
                 const roomPin = data.roomPin || socketRooms.get(socket.id) || 'general';
-                const ipAddress = normalizeIP(socket.handshake.address);  // ✅ Normalizar IP
+                const ipAddress = getRealIP(socket);  // ✅ Obtener IP real considerando proxies
                 
                 console.log(`[MESSAGE] Recibiendo mensaje para sala: ${roomPin}`, {
                     username: data.username,
@@ -516,7 +543,7 @@ module.exports = (server) => {
 
         socket.on('createRoom', async ({ name, maxParticipants, type, username }) => {
             try {
-                const ipAddress = normalizeIP(socket.handshake.address);  // ✅ Normalizar IP
+                const ipAddress = getRealIP(socket);  // ✅ Obtener IP real considerando proxies
                 const deviceFingerprint = await generateDeviceFingerprint(socket);
                 
                 // Check if user is a guest (guests cannot create rooms)
@@ -607,7 +634,7 @@ module.exports = (server) => {
                 // Check if user is the creator or admin
                 const user = await UserService.getOrCreateUser(
                     username, 
-                    normalizeIP(socket.handshake.address),  // ✅ Normalizar IP
+                    getRealIP(socket),  // ✅ Obtener IP real considerando proxies
                     await generateDeviceFingerprint(socket)
                 );
                 
@@ -646,7 +673,7 @@ module.exports = (server) => {
                     action: 'CLOSE_ROOM',
                     userId: socket.id,
                     username,
-                    ipAddress: normalizeIP(socket.handshake.address),  // ✅ Normalizar IP
+                    ipAddress: getRealIP(socket),  // ✅ Obtener IP real considerando proxies
                     roomPin: pin,
                     details: {
                         roomName: room.name,
@@ -701,7 +728,7 @@ module.exports = (server) => {
         socket.on('disconnect', async () => {
             const pin = socket.roomPin || socketRooms.get(socket.id);
             const username = socket.username || 'Desconocido';
-            const ipAddress = normalizeIP(socket.handshake.address);  // ✅ Normalizar IP
+            const ipAddress = getRealIP(socket);  // ✅ Obtener IP real considerando proxies
 
             // Deactivate session
             const session = activeSessions.get(socket.id);
