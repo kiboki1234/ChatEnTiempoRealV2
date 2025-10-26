@@ -307,9 +307,19 @@ const ChatBox = ({ initialRoomPin }) => {
                     </div>
                     
                     <h2 className="chat-username">
-                        👤 Usuario: {username} 
-                        {userRole === 'admin' && <span className="admin-badge-inline">⭐ ADMIN</span>}
-                        {localStorage.getItem('isGuest') === 'true' && <span className="guest-badge">👻 Invitado</span>}
+                        <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 16px',
+                            background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                            borderRadius: '20px',
+                            fontSize: '1rem'
+                        }}>
+                            👤 Usuario: <strong>{username}</strong>
+                            {userRole === 'admin' && <span className="admin-badge-inline">⭐ ADMIN</span>}
+                            {localStorage.getItem('isGuest') === 'true' && <span className="guest-badge">👻 Invitado</span>}
+                        </span>
                     </h2>
                     
                     <button className="dark-mode-toggle" onClick={toggleDarkMode}>

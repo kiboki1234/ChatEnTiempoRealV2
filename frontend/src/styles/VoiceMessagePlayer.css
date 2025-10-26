@@ -1,0 +1,193 @@
+/* Reproductor de mensajes de voz personalizado */
+.voice-message-player {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 4px 0;
+    min-width: 200px;
+    flex: 1;
+}
+
+.voice-play-button {
+    background: linear-gradient(135deg, #25d366 0%, #20ba5a 100%);
+    border: none;
+    color: white;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(37, 211, 102, 0.35);
+    position: relative;
+    overflow: hidden;
+}
+
+.voice-play-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.voice-play-button:hover::before {
+    opacity: 1;
+}
+
+.voice-play-button:hover {
+    transform: scale(1.08);
+    box-shadow: 0 4px 14px rgba(37, 211, 102, 0.5);
+}
+
+.voice-play-button:active {
+    transform: scale(0.98);
+    box-shadow: 0 2px 6px rgba(37, 211, 102, 0.4);
+}
+
+.voice-play-button svg {
+    width: 15px;
+    height: 15px;
+    margin-left: 1px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+.voice-progress-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.voice-progress-bar {
+    width: 100%;
+    height: 5px;
+    background: rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    overflow: hidden;
+}
+
+.voice-progress-bar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, 
+        rgba(255, 255, 255, 0.5) 0%, 
+        transparent 50%, 
+        rgba(255, 255, 255, 0.5) 100%);
+    animation: shimmer 2s infinite;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.voice-progress-bar:hover::before {
+    opacity: 0.3;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.voice-progress-bar:hover {
+    height: 7px;
+}
+
+.voice-progress-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: linear-gradient(90deg, #25d366 0%, #20ba5a 100%);
+    border-radius: 8px;
+    transition: width 0.1s linear;
+    box-shadow: 0 0 8px rgba(37, 211, 102, 0.4);
+}
+
+.voice-progress-thumb {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px;
+    height: 14px;
+    background: white;
+    border: 3px solid #25d366;
+    border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    opacity: 0;
+    transition: all 0.2s ease;
+}
+
+.voice-progress-bar:hover .voice-progress-thumb {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.1);
+}
+
+.voice-time-display {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 0 4px;
+    letter-spacing: 0.3px;
+}
+
+.voice-current-time {
+    color: #25d366;
+    font-variant-numeric: tabular-nums;
+}
+
+.voice-duration {
+    color: #667781;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Modo oscuro */
+body.dark-mode .voice-progress-bar {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+body.dark-mode .voice-progress-fill {
+    background: linear-gradient(90deg, #29e06f 0%, #25d366 100%);
+    box-shadow: 0 0 10px rgba(41, 224, 111, 0.5);
+}
+
+body.dark-mode .voice-time-display {
+    color: #b8bcc8;
+}
+
+body.dark-mode .voice-current-time {
+    color: #29e06f;
+}
+
+body.dark-mode .voice-duration {
+    color: #8696a0;
+}
+
+body.dark-mode .voice-progress-thumb {
+    border-color: #29e06f;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .voice-play-button {
+    background: linear-gradient(135deg, #29e06f 0%, #25d366 100%);
+    box-shadow: 0 2px 8px rgba(41, 224, 111, 0.4);
+}
+
+body.dark-mode .voice-play-button:hover {
+    box-shadow: 0 4px 14px rgba(41, 224, 111, 0.6);
+}
