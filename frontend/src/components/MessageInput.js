@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { FaSmile, FaPaperPlane, FaTimes, FaImage, FaPaperclip, FaFilePdf, FaFileWord, FaFileExcel, FaFileVideo, FaFileAudio, FaFileArchive, FaFile, FaMicrophone } from 'react-icons/fa';
+import { FaSmile, FaPaperPlane, FaTimes, FaImage, FaPaperclip, FaFilePdf, FaFileWord, FaFileExcel, FaFileVideo, FaFileAudio, FaFileArchive, FaFile, FaMicrophone, FaBars } from 'react-icons/fa';
 import EmojiPicker from 'emoji-picker-react';
 import socket from '../services/socketService';
 import VoiceRecorder from './VoiceRecorder';
@@ -11,6 +11,7 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [showAttachMenu, setShowAttachMenu] = useState(false);
     const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+    const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [image, setImage] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
     const [fileType, setFileType] = useState(null);
@@ -379,7 +380,8 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
             if (
                 emojiPickerRef.current &&
                 !emojiPickerRef.current.contains(event.target) &&
-                event.target.className !== 'emoji-button'
+                event.target.className !== 'emoji-button' &&
+                !event.target.closest('.mobile-action-button.emoji')
             ) {
                 setShowEmojiPicker(false);
             }
@@ -387,14 +389,24 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
             if (
                 attachMenuRef.current &&
                 !attachMenuRef.current.contains(event.target) &&
-                !event.target.closest('.attach-button')
+                !event.target.closest('.attach-button') &&
+                !event.target.closest('.mobile-action-button.attach')
             ) {
                 setShowAttachMenu(false);
+            }
+            
+            // Cerrar menú móvil al hacer clic fuera
+            if (
+                showMobileMenu &&
+                !event.target.closest('.mobile-menu-button') &&
+                !event.target.closest('.mobile-action-menu')
+            ) {
+                setShowMobileMenu(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+    }, [showMobileMenu]);
 
     // Asegúrate de que el input de archivo esté correctamente configurado
     return (
@@ -442,37 +454,89 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
                 </div>
             )}
             
-            <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Escribe un mensaje..."
-                className="input-box"
-            />
+            <div className="message-input-wrapper">
+                <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Escribe un mensaje..."
+                    className="input-box"
+                />
+                
+                {/* Botón hamburguesa para móviles */}
+                <button
+                    className="mobile-menu-button"
+                    onClick={() => setShowMobileMenu(!showMobileMenu)}
+                    title="Más opciones"
+                >
+                    <FaBars />
+                </button>
+                
+                {/* Botones para desktop */}
+                <div className="desktop-buttons">
+                    <button
+                        className="emoji-button"
+                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                        title="Emojis"
+                    >
+                        <FaSmile />
+                    </button>
+                    
+                    <button
+                        className="attach-button"
+                        onClick={() => setShowAttachMenu(!showAttachMenu)}
+                        title="Adjuntar archivo"
+                    >
+                        <FaPaperclip />
+                    </button>
+                    
+                    <button
+                        className="voice-button"
+                        onClick={() => setShowVoiceRecorder(true)}
+                        title="Grabar mensaje de voz"
+                    >
+                        <FaMicrophone />
+                    </button>
+                </div>
+                
+                <button onClick={sendMessage} className="send-button" disabled={isUploading}>
+                    <FaPaperPlane />
+                </button>
+            </div>
             
-            <button
-                className="emoji-button"
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            >
-                <FaSmile />
-            </button>
-            
-            <button
-                className="attach-button"
-                onClick={() => setShowAttachMenu(!showAttachMenu)}
-                title="Adjuntar archivo"
-            >
-                <FaPaperclip />
-            </button>
-            
-            <button
-                className="voice-button"
-                onClick={() => setShowVoiceRecorder(true)}
-                title="Grabar mensaje de voz"
-            >
-                <FaMicrophone />
-            </button>
+            {/* Menú móvil desplegable */}
+            {showMobileMenu && (
+                <div className="mobile-action-menu">
+                    <button
+                        className="mobile-action-button emoji"
+                        onClick={() => {
+                            setShowEmojiPicker(!showEmojiPicker);
+                            setShowMobileMenu(false);
+                        }}
+                    >
+                        <FaSmile /> <span>Emojis</span>
+                    </button>
+                    <button
+                        className="mobile-action-button attach"
+                        onClick={() => {
+                            setShowAttachMenu(!showAttachMenu);
+                            setShowMobileMenu(false);
+                        }}
+                    >
+                        <FaPaperclip /> <span>Archivos</span>
+                    </button>
+                    <button
+                        className="mobile-action-button voice"
+                        onClick={() => {
+                            setShowVoiceRecorder(true);
+                            setShowMobileMenu(false);
+                        }}
+                    >
+                        <FaMicrophone /> <span>Audio</span>
+                    </button>
+                </div>
+            )}
             
             {/* Menú de adjuntos tipo WhatsApp */}
             {showAttachMenu && (
@@ -551,10 +615,6 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
                 style={{ display: 'none' }}
                 disabled={isUploading}
             />
-            
-            <button onClick={sendMessage} className="send-button" disabled={isUploading}>
-                <FaPaperPlane />
-            </button>
             
             {showEmojiPicker && (
                 <div className="emoji-picker-container" ref={emojiPickerRef}>
