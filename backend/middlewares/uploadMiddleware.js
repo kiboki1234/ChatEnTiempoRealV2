@@ -66,9 +66,9 @@ const fileFilter = (req, file, cb) => {
         'application/vnd.openxmlformats-officedocument.presentationml.presentation',
         'text/plain',
         // Videos
-        'video/mp4', 'video/avi', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska',
+        'video/mp4', 'video/avi', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska', 'video/webm',
         // Audios
-        'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/x-m4a',
+        'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/x-m4a', 'audio/webm',
         // Archivos comprimidos
         'application/zip', 'application/x-zip-compressed',
         'application/x-rar-compressed', 'application/x-7z-compressed'
@@ -95,7 +95,7 @@ const cloudinaryStorageConfig = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
         folder: 'chat-images',
-        allowed_formats: ['jpg', 'png', 'jpeg', 'gif', 'webp', 'pdf'],
+        allowed_formats: ['jpg', 'png', 'jpeg', 'gif', 'webp', 'pdf', 'mp3', 'wav', 'ogg', 'm4a'],
         resource_type: 'auto'
     },
 });
@@ -371,10 +371,65 @@ router.post('/upload', (req, res, next) => {
         // File passed security checks, upload to Cloudinary
         console.log(`[SECURITY] File approved: ${req.file.originalname}`);
         
-        const uploadResult = await cloudinary.uploader.upload(tempFilePath, {
+        // Determinar el resource_type correcto para Cloudinary
+        let resourceType = 'auto';
+        const mimeType = req.file.mimetype;
+        const fileExtension = path.extname(req.file.originalname).toLowerCase();
+        
+        // Cloudinary maneja WebM como 'video' incluso para audio
+        if (mimeType === 'audio/webm' || mimeType === 'video/webm' || fileExtension === '.webm') {
+            resourceType = 'video';
+            console.log(`[CLOUDINARY] Usando resource_type 'video' para WebM`);
+        } else if (mimeType.startsWith('audio/')) {
+            resourceType = 'video'; // Cloudinary usa 'video' para todos los medios de audio/video
+            console.log(`[CLOUDINARY] Usando resource_type 'video' para audio`);
+        } else if (mimeType.startsWith('video/')) {
+            resourceType = 'video';
+            console.log(`[CLOUDINARY] Usando resource_type 'video' para video`);
+        } else if (mimeType.startsWith('image/')) {
+            resourceType = 'image';
+            console.log(`[CLOUDINARY] Usando resource_type 'image' para imagen`);
+        } else {
+            resourceType = 'raw'; // Para documentos y otros archivos
+            console.log(`[CLOUDINARY] Usando resource_type 'raw' para documento`);
+        }
+        
+        // Configuración de upload para Cloudinary con opciones adicionales
+        const uploadOptions = {
             folder: 'chat-images',
-            resource_type: 'auto'
-        });
+            resource_type: resourceType,
+            format: fileExtension.replace('.', '') || undefined, // Especificar formato explícitamente
+        };
+        
+        // Para archivos de audio/video, agregar configuraciones adicionales
+        if (resourceType === 'video') {
+            uploadOptions.audio_codec = 'opus'; // Para WebM con Opus
+            uploadOptions.video_codec = 'none'; // Sin video, solo audio
+        }
+        
+        console.log(`[CLOUDINARY] Opciones de upload:`, JSON.stringify(uploadOptions));
+        
+        let uploadResult;
+        try {
+            uploadResult = await cloudinary.uploader.upload(tempFilePath, uploadOptions);
+            console.log(`[CLOUDINARY] ✅ Upload exitoso: ${uploadResult.secure_url}`);
+        } catch (cloudinaryError) {
+            // Si falla con las opciones específicas, intentar con opciones básicas
+            console.warn(`[CLOUDINARY] ⚠️ Primer intento falló, intentando con opciones básicas...`);
+            console.warn(`[CLOUDINARY] Error:`, cloudinaryError.message);
+            
+            try {
+                // Intento con opciones mínimas
+                uploadResult = await cloudinary.uploader.upload(tempFilePath, {
+                    folder: 'chat-images',
+                    resource_type: 'raw' // Como último recurso, subir como archivo raw
+                });
+                console.log(`[CLOUDINARY] ✅ Upload exitoso como 'raw': ${uploadResult.secure_url}`);
+            } catch (fallbackError) {
+                console.error(`[CLOUDINARY] ❌ Todos los intentos fallaron`);
+                throw cloudinaryError; // Lanzar el error original
+            }
+        }
         
         // Delete temporary file
         await safeDeleteFile(tempFilePath);
@@ -434,8 +489,17 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
         }
         
         // Upload to Cloudinary
+        // Determinar el resource_type correcto
+        let resourceType = 'image';
+        if (req.file.mimetype.startsWith('audio/') || req.file.mimetype.startsWith('video/')) {
+            resourceType = 'video';
+        } else if (!req.file.mimetype.startsWith('image/')) {
+            resourceType = 'raw';
+        }
+        
         const uploadResult = await cloudinary.uploader.upload(tempFilePath, {
-            folder: 'chat-images'
+            folder: 'chat-images',
+            resource_type: resourceType
         });
         
         await safeDeleteFile(tempFilePath);
