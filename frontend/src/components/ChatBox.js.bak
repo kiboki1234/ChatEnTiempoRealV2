@@ -4,8 +4,6 @@ import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import RoomManager from './RoomManager';
 import RoomParticipants from './RoomParticipants';
-import UserStats from './UserStats';
-import AuthModal from './AuthModal';
 import '../App.css';
 
 const ADS_ENABLED = false;
@@ -13,9 +11,6 @@ const ADS_ENABLED = false;
 const ChatBox = ({ initialRoomPin }) => {
     const [messages, setMessages] = useState([]);
     const [username, setUsername] = useState('');
-    const [showAuthModal, setShowAuthModal] = useState(false);
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [userRole, setUserRole] = useState('user');
     const [replyTo, setReplyTo] = useState(null);
     const [currentRoom, setCurrentRoom] = useState('general');
     const [roomInfo, setRoomInfo] = useState({ name: 'Chat General' });
@@ -48,32 +43,10 @@ const ChatBox = ({ initialRoomPin }) => {
         if (storedUsername) {
             return storedUsername;
         } else {
-            // Si no hay username, mostrar modal de autenticación
-            setShowAuthModal(true);
-            return '';
+            const newUsername = `User-${Math.random().toString(36).substring(2, 8)}`;
+            localStorage.setItem('username', newUsername);
+            return newUsername;
         }
-    };
-
-    const handleAuthSuccess = (authData) => {
-        setUsername(authData.username);
-        setUserRole(authData.role || 'user');
-        setIsAuthenticated(true);
-        setShowAuthModal(false);
-        
-        // Si hay una sala pendiente de unirse (desde URL)
-        if (initialRoomPin) {
-            handleJoinRoom(initialRoomPin);
-        }
-    };
-
-    const handleLogout = () => {
-        localStorage.removeItem('userToken');
-        localStorage.removeItem('username');
-        localStorage.removeItem('userRole');
-        localStorage.removeItem('isGuest');
-        setIsAuthenticated(false);
-        setUsername('');
-        setShowAuthModal(true);
     };
 
     const requestNotificationPermission = async () => {
@@ -109,6 +82,26 @@ const ChatBox = ({ initialRoomPin }) => {
             const currentUsername = generateUsername();
             setUsername(currentUsername);
         }
+    }, []);
+
+    // Manejar errores del socket
+    useEffect(() => {
+        const handleError = (error) => {
+            console.error('Error en el socket:', error);
+            setError(error.message || 'Error de conexión');
+            // Si es un error de sesión duplicada, forzar recarga
+            if (error.message && error.message.includes('ya tiene una sesión activa')) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 3000);
+            }
+        };
+
+        socket.on('error', handleError);
+
+        return () => {
+            socket.off('error', handleError);
+        };
     }, []);
 
     useEffect(() => {
@@ -174,15 +167,36 @@ const ChatBox = ({ initialRoomPin }) => {
         };
     }, [currentRoom, username]);
 
+    const handleJoinRoom = (pin) => {
+        if (!pin || !username) return;
+        
+        setAutoJoining(true);
+        setError(null);
+        
+        console.log('Uniéndose a la sala:', { pin, username });
+        
+        // Verificar si ya está en la sala
+        if (currentRoom === pin) {
+            setAutoJoining(false);
+            return;
+        }
+        
+        // Si está en otra sala, salir primero
+        if (currentRoom && currentRoom !== 'general') {
+            console.log('Saliendo de la sala actual antes de unirse a la nueva');
+            socket.emit('leaveRoom');
+        }
+        
+        // Emitir el evento joinRoom con el nombre de usuario
+        socket.emit('joinRoom', {
+            pin,
+            username
+        });
+    };
+
     useEffect(() => {
         if (initialRoomPin) {
-            setAutoJoining(true);
-            console.log('Uniéndose automáticamente a la sala con PIN:', initialRoomPin);
-            socket.emit('joinRoom', {
-                pin: initialRoomPin,
-                username: username || generateUsername()
-            });
-            setCurrentRoom(initialRoomPin);
+            handleJoinRoom(initialRoomPin);
         }
     }, [initialRoomPin, username]);
 
@@ -205,30 +219,34 @@ const ChatBox = ({ initialRoomPin }) => {
     };
 
     const handleJoinRoom = (pin) => {
-        if (currentRoom === pin) return;
-
-        console.log('Joining room with PIN:', pin);
-
+        if (!pin || !username) return;
+        
+        setAutoJoining(true);
         setError(null);
-
-        if (currentRoom !== 'general') {
-            console.log('Leaving current room before joining new one');
+        
+        console.log('Uniéndose a la sala:', { pin, username });
+        
+        // Verificar si ya está en la sala
+        if (currentRoom === pin) {
+            setAutoJoining(false);
+            return;
+        }
+        
+        // Si está en otra sala, salir primero
+        if (currentRoom && currentRoom !== 'general') {
+            console.log('Saliendo de la sala actual antes de unirse a la nueva');
             socket.emit('leaveRoom');
         }
-
-        socket.emit('joinRoom', { pin, username });
+        
+        // Emitir el evento joinRoom con el nombre de usuario
+        socket.emit('joinRoom', {
+            pin,
+            username
+        });
     };
 
     return (
         <div className="page-container">
-            {/* Auth Modal */}
-            {showAuthModal && (
-                <AuthModal 
-                    onAuthSuccess={handleAuthSuccess}
-                    onClose={() => setShowAuthModal(false)}
-                />
-            )}
-            
             <div className="content-container">
                 {ADS_ENABLED && (
                     <div className="ad-container ad-left">
@@ -242,21 +260,10 @@ const ChatBox = ({ initialRoomPin }) => {
                 )}
 
                 <div className="chat-container">
-                    <div className="chat-header-container">
-                        <h1 className="chat-header">
-                            {autoJoining ? 'Uniéndose a la sala...' : roomInfo.name}
-                        </h1>
-                        <button className="logout-button" onClick={handleLogout} title="Cerrar sesión">
-                            🚪 Salir
-                        </button>
-                    </div>
-                    
-                    <h2 className="chat-username">
-                        👤 Usuario: {username} 
-                        {userRole === 'admin' && <span className="admin-badge-inline">⭐ ADMIN</span>}
-                        {localStorage.getItem('isGuest') === 'true' && <span className="guest-badge">👻 Invitado</span>}
-                    </h2>
-                    
+                    <h1 className="chat-header">
+                        {autoJoining ? 'Uniéndose a la sala...' : roomInfo.name}
+                    </h1>
+                    <h2 className="chat-username">Usuario: {username}</h2>
                     <button className="dark-mode-toggle" onClick={toggleDarkMode}>
                         {darkMode ? '☀️ Modo Claro' : '🌙 Modo Oscuro'}
                     </button>
@@ -270,8 +277,6 @@ const ChatBox = ({ initialRoomPin }) => {
                         handleLeaveRoom={handleLeaveRoom}
                     />
                     
-                    {/* User Stats Component */}
-                    <UserStats username={username} />
                     
                     <div className="current-room-info">
                         <h3>Sala Actual: {roomInfo.name} {currentRoom !== 'general' && `(PIN: ${currentRoom})`}</h3>

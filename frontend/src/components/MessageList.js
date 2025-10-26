@@ -4,9 +4,21 @@ import Linkify from 'react-linkify'; // Convierte texto en enlaces clickeables
 import axios from 'axios'; // Para solicitudes HTTP
 import '../styles/sendMessages.css';
 
-const MessageList = ({ messages, onReply, username }) => {
+const MessageList = ({ messages = [], onReply, username }) => {
     const messageEndRef = useRef(null);
     const [previews, setPreviews] = useState({}); // Almacena las previsualizaciones
+
+    // Log cuando cambian los mensajes
+    useEffect(() => {
+        console.log(' Mensajes en MessageList:', messages);
+        
+        // Verificar si hay mensajes y si tienen el formato correcto
+        if (messages && messages.length > 0) {
+            console.log(' Primer mensaje de ejemplo:', messages[0]);
+        } else {
+            console.log(' No hay mensajes para mostrar');
+        }
+    }, [messages]);
 
     // Función para formatear fecha
     const formatDate = (timestamp) => {

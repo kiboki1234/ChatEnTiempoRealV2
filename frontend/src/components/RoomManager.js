@@ -6,10 +6,6 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
     const [rooms, setRooms] = useState([]);
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [showJoinForm, setShowJoinForm] = useState(false);
-    const [showLoginForm, setShowLoginForm] = useState(false);
-    const [loginUsername, setLoginUsername] = useState('');
-    const [loginPassword, setLoginPassword] = useState('');
-    const [loginError, setLoginError] = useState('');
     const [roomName, setRoomName] = useState('');
     const [maxParticipants, setMaxParticipants] = useState(5);
     const [pinToJoin, setPinToJoin] = useState('');
@@ -102,8 +98,11 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
         // Suscribirse al evento de sala creada
         socket.on('roomCreated', onRoomCreated);
 
-        // Emitir el evento para crear la sala
-        socket.emit('createRoom', newRoom);
+        // Emitir el evento para crear la sala (ahora incluye username)
+        socket.emit('createRoom', {
+            ...newRoom,
+            username: username // Agregar username del usuario actual
+        });
 
         setRoomName('');
         setMaxParticipants(5);
@@ -129,6 +128,9 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
         onJoinRoom(pin);
     };
 
+    // Check if user is a guest
+    const isGuest = username && username.startsWith('guest_');
+
     return (
         <div className="room-manager">
             <h2>Gestión de Salas</h2>
@@ -136,39 +138,58 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
             {error && <div className="error-message">{error}</div>}
             {success && <div className="success-message">{success}</div>}
             
+            {isGuest && (
+                <div className="info-message" style={{
+                    backgroundColor: '#fff3cd',
+                    color: '#856404',
+                    padding: '12px',
+                    borderRadius: '4px',
+                    marginBottom: '15px',
+                    border: '1px solid #ffeeba'
+                }}>
+                    👻 <strong>Modo Invitado:</strong> Solo puedes acceder al Chat General. 
+                    <a href="#" onClick={(e) => {
+                        e.preventDefault();
+                        localStorage.clear();
+                        window.location.reload();
+                    }} style={{ color: '#004085', textDecoration: 'underline', marginLeft: '5px' }}>
+                        Regístrate
+                    </a> para crear y unirte a salas privadas.
+                </div>
+            )}
+            
             <div className="room-actions">
-                {showLoginForm ? (
-                    <button 
-                        onClick={() => {
-                            setShowLoginForm(false);
-                            setLoginUsername('');
-                            setLoginPassword('');
-                            setLoginError('');
-                        }}
-                        className="room-button"
-                    >
-                        Cerrar Sesión
-                    </button>
-                ) : (
-                    <button 
-                        onClick={() => {
-                            setShowLoginForm(true);
-                            setShowCreateForm(false);
-                            setShowJoinForm(false);
-                        }}
-                        className="room-button"
-                    >
-                        Crear Sala
-                    </button>
-                )}
                 <button 
                     onClick={() => {
+                        if (isGuest) {
+                            setError('Los invitados no pueden crear salas. Por favor, regístrate.');
+                            setTimeout(() => setError(''), 3000);
+                            return;
+                        }
+                        setShowCreateForm(!showCreateForm);
+                        setShowJoinForm(false);
+                    }}
+                    className="room-button"
+                    disabled={isGuest}
+                    style={isGuest ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                >
+                    {showCreateForm ? 'Cancelar' : 'Crear Sala'}
+                </button>
+                <button 
+                    onClick={() => {
+                        if (isGuest) {
+                            setError('Los invitados no pueden unirse a salas privadas. Por favor, regístrate.');
+                            setTimeout(() => setError(''), 3000);
+                            return;
+                        }
                         setShowJoinForm(!showJoinForm);
                         setShowCreateForm(false);
                     }}
                     className="room-button"
+                    disabled={isGuest}
+                    style={isGuest ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                 >
-                    Unirse a Sala
+                    {showJoinForm ? 'Cancelar' : 'Unirse a Sala'}
                 </button>
                 <button 
                     onClick={() => onJoinRoom('general')}
@@ -178,41 +199,7 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
                 </button>
             </div>
             
-            {showLoginForm && (
-                <form onSubmit={(e) => {
-                    e.preventDefault();
-                    if (loginUsername === 'admin' && loginPassword === 'admin') {
-                        setShowLoginForm(false);
-                        setShowCreateForm(true);
-                        setLoginError('');
-                    } else {
-                        setLoginError('Credenciales inválidas. Usuario: admin, Contraseña: admin');
-                    }
-                }} className="room-form">
-                    <h3>Iniciar Sesión</h3>
-                    <div className="form-group">
-                        <label>Usuario:</label>
-                        <input 
-                            type="text" 
-                            value={loginUsername} 
-                            onChange={(e) => setLoginUsername(e.target.value)}
-                            required
-                        />
-                    </div>
-                    <div className="form-group">
-                        <label>Contraseña:</label>
-                        <input 
-                            type="password" 
-                            value={loginPassword} 
-                            onChange={(e) => setLoginPassword(e.target.value)}
-                            required
-                        />
-                    </div>
-                    {loginError && <div className="error-message">{loginError}</div>}
-                    <button type="submit" className="room-button">Iniciar Sesión</button>
-                </form>
-            )}
-            {showCreateForm && (
+            {showCreateForm && !isGuest && (
                 <form onSubmit={handleCreateRoom} className="room-form">
                     <h3>Crear Nueva Sala</h3>
                     <div className="form-group">
@@ -274,7 +261,7 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
                 </div>
             )}
             
-            {showJoinForm && (
+            {showJoinForm && !isGuest && (
                 <form onSubmit={handleJoinRoom} className="room-form">
                     <h3>Unirse a una Sala</h3>
                     <div className="form-group">
@@ -296,7 +283,24 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
             <div className="rooms-list">
                 <h3>Salas Disponibles</h3>
 
-                {rooms.length === 0 ? (
+                {isGuest ? (
+                    <div style={{
+                        padding: '20px',
+                        textAlign: 'center',
+                        color: '#666'
+                    }}>
+                        <p>👻 Los invitados solo tienen acceso al Chat General</p>
+                        <p style={{ fontSize: '0.9em', marginTop: '10px' }}>
+                            <a href="#" onClick={(e) => {
+                                e.preventDefault();
+                                localStorage.clear();
+                                window.location.reload();
+                            }} style={{ color: '#007bff', textDecoration: 'underline' }}>
+                                Regístrate aquí
+                            </a> para ver y unirte a salas privadas
+                        </p>
+                    </div>
+                ) : rooms.length === 0 ? (
                     <p>No hay salas disponibles</p>
                 ) : (
                     <ul>

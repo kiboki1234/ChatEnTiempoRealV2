@@ -9,6 +9,7 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
     const [input, setInput] = useState('');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [image, setImage] = useState(null);
+    const [imagePreview, setImagePreview] = useState(null);
     const emojiPickerRef = useRef(null);
 
     const addEmojiToInput = (emojiObject) => {
@@ -53,11 +54,27 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
             timestamp: new Date().toISOString(),
         };
 
-        console.log('Enviando mensaje:', newMessage);
-        socket.emit('sendMessage', newMessage);
+        console.log('📤 Enviando mensaje:', newMessage);
+        
+        // Emitir el mensaje a través del socket
+        socket.emit('sendMessage', newMessage, (response) => {
+            if (response && response.success) {
+                console.log('✅ Mensaje enviado con éxito');
+            } else {
+                console.error('❌ Error al enviar el mensaje:', response?.error || 'Error desconocido');
+                // Podrías querer mostrar un mensaje de error al usuario aquí
+                alert('Error al enviar el mensaje. Por favor, inténtalo de nuevo.');
+            }
+        });
+        
+        // Limpiar el formulario
         setInput('');
         setImage(null);
+        setImagePreview(null);
         setReplyTo(null);
+        // Limpiar el input file
+        const fileInput = document.getElementById('image-upload');
+        if (fileInput) fileInput.value = '';
     };
 
     const handleKeyPress = (e) => {
@@ -65,7 +82,24 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
     };
 
     const handleImageChange = (e) => {
-        setImage(e.target.files[0]);
+        const file = e.target.files[0];
+        if (file) {
+            setImage(file);
+            // Crear URL de previsualización
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImagePreview(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const cancelImage = () => {
+        setImage(null);
+        setImagePreview(null);
+        // Limpiar el input file
+        const fileInput = document.getElementById('image-upload');
+        if (fileInput) fileInput.value = '';
     };
 
     const cancelReply = () => {
@@ -89,6 +123,19 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
     // Asegúrate de que el input de archivo esté correctamente configurado
     return (
         <div className="message-input">
+            {/* Previsualización de imagen */}
+            {imagePreview && (
+                <div className="image-preview-container">
+                    <div className="image-preview-wrapper">
+                        <img src={imagePreview} alt="Preview" className="image-preview" />
+                        <button className="cancel-image-button" onClick={cancelImage} title="Eliminar imagen">
+                            <FaTimes />
+                        </button>
+                    </div>
+                    <p className="image-preview-label">Vista previa de la imagen</p>
+                </div>
+            )}
+            
             {replyTo && (
                 <div className="reply-preview">
                     Respondiendo a: {replyTo.username} - "{replyTo.message}"

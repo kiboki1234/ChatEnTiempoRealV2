@@ -588,3 +588,154 @@ body.dark-mode .leave-room-button {
 body.dark-mode .leave-room-button:hover {
     background-color: #7f0000;
 }
+
+/* Auth Modal Styles Integration */
+.chat-header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.logout-button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.logout-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+}
+
+.admin-badge-inline {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    padding: 3px 10px;
+    border-radius: 15px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-left: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.guest-badge {
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    padding: 3px 10px;
+    border-radius: 15px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+body.dark-mode .logout-button {
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.5);
+}
+
+body.dark-mode .logout-button:hover {
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.7);
+}
+
+/* ====================================
+   PREVISUALIZACIÓN DE IMAGEN
+   ==================================== */
+.image-preview-container {
+    position: absolute;
+    bottom: 60px;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 2px solid #4caf50;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.image-preview-wrapper {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+}
+
+.image-preview {
+    max-width: 300px;
+    max-height: 200px;
+    width: auto;
+    height: auto;
+    border-radius: 8px;
+    display: block;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.cancel-image-button {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #ff4444;
+    color: white;
+    border: 2px solid white;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+}
+
+.cancel-image-button:hover {
+    background: #cc0000;
+    transform: scale(1.1);
+}
+
+.image-preview-label {
+    margin: 10px 0 0 0;
+    color: #666;
+    font-size: 13px;
+    text-align: center;
+}
+
+/* Tema oscuro para previsualización */
+body.dark-mode .image-preview-container {
+    background: #2a2a2a;
+    border-color: #5cb85c;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .image-preview-label {
+    color: #b0b0b0;
+}
+
+body.dark-mode .cancel-image-button {
+    border-color: #2a2a2a;
+}
+
+/* Ajuste para que el message-input tenga espacio */
+.message-input {
+    position: relative;
+}
+
+

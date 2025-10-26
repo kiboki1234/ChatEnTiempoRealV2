@@ -1,4 +1,6 @@
 const Room = require('../models/Room');
+const AuditLog = require('../models/AuditLog');
+const encryptionService = require('../services/encryptionService');
 
 // Generate a random 6-digit PIN
 const generatePin = () => {
@@ -6,7 +8,7 @@ const generatePin = () => {
 };
 
 // Create a new room
-const createRoom = async (name, maxParticipants = 5) => {
+const createRoom = async (name, maxParticipants = 10, type = 'text', adminId = null, expiresIn = null, username = null) => {
     try {
         let pin;
         let roomExists = true;
@@ -20,13 +22,27 @@ const createRoom = async (name, maxParticipants = 5) => {
             }
         }
         
+        // Calculate expiration date if provided
+        let expiresAt = null;
+        if (expiresIn) {
+            expiresAt = new Date(Date.now() + expiresIn * 60 * 60 * 1000); // hours to milliseconds
+        }
+        
         const room = new Room({
             pin,
             name,
-            maxParticipants
+            type,
+            maxParticipants: Math.max(2, maxParticipants),
+            createdBy: adminId,
+            createdByUsername: username || 'system',
+            expiresAt
         });
         
         await room.save();
+        
+        // Generate ephemeral encryption key for the room
+        encryptionService.generateRoomKey(pin);
+        
         return room;
     } catch (error) {
         console.error('Error creating room:', error);
@@ -37,32 +53,94 @@ const createRoom = async (name, maxParticipants = 5) => {
 // Get a room by PIN
 const getRoomByPin = async (pin) => {
     try {
-        return await Room.findOne({ pin });
+        const room = await Room.findOne({ pin, isActive: true });
+        
+        if (!room) {
+            return null;
+        }
+        
+        // Check if room is expired
+        if (room.isExpired()) {
+            room.isActive = false;
+            await room.save();
+            return null;
+        }
+        
+        return room;
     } catch (error) {
         console.error('Error getting room:', error);
         throw error;
     }
 };
 
-// Add a participant to a room
-const addParticipant = async (pin, socketId, username) => {
+// Verify room PIN
+const verifyRoomPin = async (pin, providedPin) => {
     try {
-        const room = await Room.findOne({ pin });
+        const room = await Room.findOne({ pin, isActive: true });
+        
+        if (!room) {
+            return { valid: false, message: 'Room not found' };
+        }
+        
+        if (room.isExpired()) {
+            room.isActive = false;
+            await room.save();
+            return { valid: false, message: 'Room has expired' };
+        }
+        
+        const isValid = await room.comparePin(providedPin);
+        
+        return {
+            valid: isValid,
+            message: isValid ? 'PIN verified' : 'Invalid PIN',
+            room: isValid ? room : null
+        };
+    } catch (error) {
+        console.error('Error verifying PIN:', error);
+        throw error;
+    }
+};
+
+// Add a participant to a room
+const addParticipant = async (pin, socketId, username, ipAddress, deviceFingerprint) => {
+    try {
+        const room = await Room.findOne({ pin, isActive: true });
+        
         if (!room) {
             return { success: false, message: 'Room not found' };
+        }
+        
+        if (room.isExpired()) {
+            room.isActive = false;
+            await room.save();
+            return { success: false, message: 'Room has expired' };
         }
         
         if (room.participants.length >= room.maxParticipants) {
             return { success: false, message: 'Room is full' };
         }
         
-        // Check if user is already in the room
-        const existingParticipant = room.participants.find(p => p.username === username);
+        // Check if user already has an active session in this room
+        const existingParticipant = room.participants.find(
+            p => p.username === username || 
+                 (p.ipAddress === ipAddress && p.deviceFingerprint === deviceFingerprint)
+        );
+        
         if (existingParticipant) {
-            return { success: false, message: 'You are already in this room' };
+            // Update existing participant
+            existingParticipant.socketId = socketId;
+            existingParticipant.joinedAt = new Date();
+        } else {
+            // Add new participant
+            room.participants.push({
+                socketId,
+                username,
+                ipAddress,
+                deviceFingerprint,
+                joinedAt: new Date()
+            });
         }
         
-        room.participants.push({ socketId, username });
         await room.save();
         return { success: true, room };
     } catch (error) {
@@ -88,12 +166,92 @@ const removeParticipant = async (socketId) => {
     }
 };
 
-// Get all rooms
+// Get all active rooms
 const getAllRooms = async () => {
     try {
-        return await Room.find().select('pin name maxParticipants participants');
+        const rooms = await Room.find({ isActive: true })
+            .select('roomId pin name type maxParticipants participants createdAt expiresAt')
+            .lean();
+        
+        // Filter out expired rooms
+        const activeRooms = rooms.filter(room => {
+            if (!room.expiresAt) return true;
+            return new Date() < new Date(room.expiresAt);
+        });
+        
+        // Return rooms without sensitive info
+        return activeRooms.map(room => ({
+            roomId: room.roomId,
+            name: room.name,
+            type: room.type,
+            participantCount: room.participants.length,
+            maxParticipants: room.maxParticipants,
+            isFull: room.participants.length >= room.maxParticipants,
+            createdAt: room.createdAt,
+            expiresAt: room.expiresAt
+        }));
     } catch (error) {
         console.error('Error getting rooms:', error);
+        throw error;
+    }
+};
+
+// Delete a room (admin only)
+const deleteRoom = async (pin, adminId) => {
+    try {
+        const room = await Room.findOne({ pin });
+        
+        if (!room) {
+            return { success: false, message: 'Room not found' };
+        }
+        
+        // Clear room encryption key
+        encryptionService.clearRoomKey(pin);
+        
+        // Soft delete
+        room.isActive = false;
+        await room.save();
+        
+        // Log the action
+        await AuditLog.create({
+            action: 'DELETE_ROOM',
+            userId: adminId,
+            username: 'admin',
+            ipAddress: 'system',
+            roomPin: pin,
+            details: {
+                roomName: room.name,
+                participantCount: room.participants.length
+            }
+        });
+        
+        return { success: true, message: 'Room deleted successfully' };
+    } catch (error) {
+        console.error('Error deleting room:', error);
+        throw error;
+    }
+};
+
+// Clean up expired rooms (scheduled task)
+const cleanupExpiredRooms = async () => {
+    try {
+        const expiredRooms = await Room.find({
+            isActive: true,
+            expiresAt: { $lt: new Date() }
+        });
+        
+        for (const room of expiredRooms) {
+            room.isActive = false;
+            await room.save();
+            
+            // Clear encryption key
+            encryptionService.clearRoomKey(room.pin);
+        }
+        
+        console.log(`Cleaned up ${expiredRooms.length} expired rooms`);
+        return expiredRooms.length;
+    } catch (error) {
+        console.error('Error cleaning up expired rooms:', error);
         throw error;
     }
 };
@@ -101,7 +259,10 @@ const getAllRooms = async () => {
 module.exports = {
     createRoom,
     getRoomByPin,
+    verifyRoomPin,
     addParticipant,
     removeParticipant,
-    getAllRooms
+    getAllRooms,
+    deleteRoom,
+    cleanupExpiredRooms
 };
