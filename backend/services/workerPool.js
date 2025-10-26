@@ -101,9 +101,21 @@ const messageWorkerPool = new WorkerPool(
     os.cpus().length
 );
 
+const authWorkerPool = new WorkerPool(
+    path.join(__dirname, 'workers', 'authWorker.js'),
+    os.cpus().length
+);
+
+const roomWorkerPool = new WorkerPool(
+    path.join(__dirname, 'workers', 'roomWorker.js'),
+    Math.max(2, os.cpus().length)
+);
+
 module.exports = {
     WorkerPool,
     steganographyWorkerPool,
     encryptionWorkerPool,
-    messageWorkerPool
+    messageWorkerPool,
+    authWorkerPool,
+    roomWorkerPool
 };

@@ -23,6 +23,12 @@ class EncryptionService {
         return this.roomKeys.get(roomPin);
     }
 
+    // Set room key (for external key generation)
+    setRoomKey(roomPin, key) {
+        this.roomKeys.set(roomPin, key);
+        return key;
+    }
+
     // Encrypt message using AES-256-GCM
     encryptMessage(message, roomPin) {
         try {

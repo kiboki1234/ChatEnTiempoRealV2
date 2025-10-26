@@ -1,35 +1,51 @@
 const Room = require('../models/Room');
 const AuditLog = require('../models/AuditLog');
 const encryptionService = require('../services/encryptionService');
-
-// Generate a random 6-digit PIN
-const generatePin = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-};
+const { roomWorkerPool } = require('../services/workerPool');
 
 // Create a new room
 const createRoom = async (name, maxParticipants = 10, type = 'text', adminId = null, expiresIn = null, username = null) => {
     try {
-        let pin;
-        let roomExists = true;
-        
-        // Generate a unique PIN
-        while (roomExists) {
-            pin = generatePin();
-            const existingRoom = await Room.findOne({ pin });
-            if (!existingRoom) {
-                roomExists = false;
+        // Use worker thread to generate room data in parallel
+        const roomDataResult = await roomWorkerPool.executeTask({
+            operation: 'generateRoomData',
+            data: {
+                name: name,
+                expiresIn: expiresIn
             }
+        });
+        
+        if (!roomDataResult.success) {
+            throw new Error(roomDataResult.error);
         }
         
-        // Calculate expiration date if provided
-        let expiresAt = null;
-        if (expiresIn) {
-            expiresAt = new Date(Date.now() + expiresIn * 60 * 60 * 1000); // hours to milliseconds
+        const { pin, roomId, encryptionKey, expiresAt } = roomDataResult.result;
+        
+        // Verify PIN is unique
+        let uniquePin = pin;
+        let attempts = 0;
+        const maxAttempts = 10;
+        
+        while (attempts < maxAttempts) {
+            const existingRoom = await Room.findOne({ pin: uniquePin });
+            if (!existingRoom) {
+                break;
+            }
+            // Generate new PIN if collision detected
+            const newPinResult = await roomWorkerPool.executeTask({
+                operation: 'generatePin',
+                data: {}
+            });
+            uniquePin = newPinResult.result;
+            attempts++;
+        }
+        
+        if (attempts >= maxAttempts) {
+            throw new Error('Failed to generate unique PIN after multiple attempts');
         }
         
         const room = new Room({
-            pin,
+            pin: uniquePin,
             name,
             type,
             maxParticipants: Math.max(2, maxParticipants),
@@ -40,8 +56,10 @@ const createRoom = async (name, maxParticipants = 10, type = 'text', adminId = n
         
         await room.save();
         
-        // Generate ephemeral encryption key for the room
-        encryptionService.generateRoomKey(pin);
+        // Store ephemeral encryption key for the room
+        encryptionService.setRoomKey(uniquePin, Buffer.from(encryptionKey, 'hex'));
+        
+        console.log(`✅ Room created with worker threads: ${name} (PIN: ${uniquePin})`);
         
         return room;
     } catch (error) {
@@ -104,6 +122,22 @@ const verifyRoomPin = async (pin, providedPin) => {
 // Add a participant to a room
 const addParticipant = async (pin, socketId, username, ipAddress, deviceFingerprint) => {
     try {
+        // Validate participant data using worker thread
+        const validationResult = await roomWorkerPool.executeTask({
+            operation: 'validateParticipant',
+            data: {
+                username: username,
+                ipAddress: ipAddress
+            }
+        });
+        
+        if (!validationResult.success || !validationResult.result.valid) {
+            return { 
+                success: false, 
+                message: validationResult.result.errors.join(', ') 
+            };
+        }
+        
         const room = await Room.findOne({ pin, isActive: true });
         
         if (!room) {
@@ -142,6 +176,7 @@ const addParticipant = async (pin, socketId, username, ipAddress, deviceFingerpr
         }
         
         await room.save();
+        console.log(`✅ Participant added with worker thread validation: ${username} to room ${pin}`);
         return { success: true, room };
     } catch (error) {
         console.error('Error adding participant:', error);

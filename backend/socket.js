@@ -6,6 +6,7 @@ const { createMessage } = require('./controllers/chatController');
 const roomController = require('./controllers/roomController');
 const encryptionService = require('./services/encryptionService');
 const UserService = require('./services/userService');
+const { messageWorkerPool, authWorkerPool } = require('./services/workerPool');
 const crypto = require('crypto');
 
 const socketRooms = new Map();
@@ -69,13 +70,28 @@ module.exports = (server) => {
     };
 
     // Generate device fingerprint from socket handshake
-    const generateDeviceFingerprint = (socket) => {
+    const generateDeviceFingerprint = async (socket) => {
         const data = {
             userAgent: socket.handshake.headers['user-agent'],
             language: socket.handshake.headers['accept-language'],
             encoding: socket.handshake.headers['accept-encoding']
         };
         
+        // Use worker thread for fingerprint generation
+        try {
+            const result = await authWorkerPool.executeTask({
+                operation: 'generateFingerprint',
+                data: data
+            });
+            
+            if (result.success) {
+                return result.result;
+            }
+        } catch (error) {
+            console.error('Error generating fingerprint with worker:', error);
+        }
+        
+        // Fallback to synchronous generation
         return crypto
             .createHash('sha256')
             .update(JSON.stringify(data))
@@ -170,7 +186,7 @@ module.exports = (server) => {
     const joinRoom = async (socket, pin, username) => {
         const rawIP = socket.handshake.address;
         const ipAddress = normalizeIP(rawIP);  // ✅ Normalizar IP
-        const deviceFingerprint = generateDeviceFingerprint(socket);
+        const deviceFingerprint = await generateDeviceFingerprint(socket);
 
         // ✅ VALIDACIÓN DE SESIÓN ÚNICA (PARA TODAS LAS SALAS, INCLUYENDO GENERAL)
         const sessionCheck = await canUserJoin(username, ipAddress, deviceFingerprint, socket.id);
@@ -417,8 +433,43 @@ module.exports = (server) => {
                     hasText: !!data.message
                 });
 
-                // Save message (already sanitized by worker if needed)
-                const message = await createMessage({ ...data, roomPin });
+                // Validate and sanitize message using worker thread (if text message)
+                let processedMessage = data.message;
+                if (data.message && !data.imageUrl && !data.voiceUrl) {
+                    try {
+                        const messageResult = await messageWorkerPool.executeTask({
+                            message: data.message,
+                            options: { maxLength: 5000 }
+                        });
+                        
+                        if (!messageResult.success) {
+                            console.error('[MESSAGE] ❌ Message validation failed:', messageResult.errors);
+                            socket.emit('messageError', { 
+                                message: 'Mensaje inválido: ' + (messageResult.errors?.join(', ') || 'Error desconocido')
+                            });
+                            if (callback) {
+                                callback({ success: false, error: 'Message validation failed' });
+                            }
+                            return;
+                        }
+                        
+                        // Use sanitized message
+                        processedMessage = messageResult.result.sanitized;
+                        console.log(`[MESSAGE] ✅ Message processed by worker thread`);
+                    } catch (workerError) {
+                        console.error('[MESSAGE] ⚠️ Worker error, using original message:', workerError);
+                        // Continue with original message if worker fails
+                    }
+                }
+                
+                // Save message with processed content
+                const messageData = {
+                    ...data,
+                    message: processedMessage,
+                    roomPin
+                };
+                
+                const message = await createMessage(messageData);
                 
                 console.log(`[MESSAGE] Mensaje guardado con ID: ${message._id}, emitiendo a sala: ${roomPin}`);
 
@@ -434,9 +485,11 @@ module.exports = (server) => {
                     userAgent: socket.handshake.headers['user-agent'],
                     roomPin,
                     details: {
-                        messageLength: data.message?.length || 0,
+                        messageLength: processedMessage?.length || 0,
                         hasImage: !!data.imageUrl,
-                        hasSticker: !!data.sticker
+                        hasSticker: !!data.sticker,
+                        hasVoice: !!data.voiceUrl,
+                        wasProcessedByWorker: !!processedMessage && processedMessage !== data.message
                     }
                 });
                 
@@ -460,7 +513,7 @@ module.exports = (server) => {
         socket.on('createRoom', async ({ name, maxParticipants, type, username }) => {
             try {
                 const ipAddress = normalizeIP(socket.handshake.address);  // ✅ Normalizar IP
-                const deviceFingerprint = generateDeviceFingerprint(socket);
+                const deviceFingerprint = await generateDeviceFingerprint(socket);
                 
                 // Check if user is a guest (guests cannot create rooms)
                 if (username && username.startsWith('guest_')) {
@@ -551,7 +604,7 @@ module.exports = (server) => {
                 const user = await UserService.getOrCreateUser(
                     username, 
                     normalizeIP(socket.handshake.address),  // ✅ Normalizar IP
-                    generateDeviceFingerprint(socket)
+                    await generateDeviceFingerprint(socket)
                 );
                 
                 const isCreator = room.createdByUsername === username;

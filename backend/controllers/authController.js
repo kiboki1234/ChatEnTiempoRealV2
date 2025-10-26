@@ -2,6 +2,7 @@ const User = require('../models/User');
 const AuditLog = require('../models/AuditLog');
 const jwt = require('jsonwebtoken');
 const speakeasy = require('speakeasy');
+const { authWorkerPool } = require('../services/workerPool');
 
 // Register a new admin (should be restricted in production)
 const registerAdmin = async (req, res) => {
@@ -59,9 +60,16 @@ const loginAdmin = async (req, res) => {
         
         console.log('✅ User found:', { username, has2FA: user.twoFactorEnabled });
         
-        // Check password
-        const isPasswordValid = await user.comparePassword(password);
-        if (!isPasswordValid) {
+        // Use worker thread for password comparison (CPU-intensive)
+        const passwordCheckResult = await authWorkerPool.executeTask({
+            operation: 'comparePassword',
+            data: {
+                password: password,
+                hash: user.password
+            }
+        });
+        
+        if (!passwordCheckResult.success || !passwordCheckResult.result) {
             console.log('❌ Invalid password for user:', username);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
@@ -82,14 +90,17 @@ const loginAdmin = async (req, res) => {
             }
             
             console.log('🔍 Verifying 2FA code...');
-            const verified = speakeasy.totp.verify({
-                secret: user.twoFactorSecret,
-                encoding: 'base32',
-                token: twoFactorCode,
-                window: 2
+            
+            // Use worker thread for 2FA verification
+            const twoFAResult = await authWorkerPool.executeTask({
+                operation: 'verify2FA',
+                data: {
+                    secret: user.twoFactorSecret,
+                    token: twoFactorCode
+                }
             });
             
-            if (!verified) {
+            if (!twoFAResult.success || !twoFAResult.result) {
                 console.log('❌ Invalid 2FA code');
                 return res.status(401).json({ 
                     error: 'Código 2FA inválido. Por favor verifica e intenta nuevamente.' 
@@ -191,16 +202,19 @@ const enable2FA = async (req, res) => {
         }
         
         console.log('🔍 Verifying code...');
-        const verified = speakeasy.totp.verify({
-            secret: user.twoFactorSecret,
-            encoding: 'base32',
-            token: twoFactorCode,
-            window: 2
+        
+        // Use worker thread for 2FA verification
+        const verificationResult = await authWorkerPool.executeTask({
+            operation: 'verify2FA',
+            data: {
+                secret: user.twoFactorSecret,
+                token: twoFactorCode
+            }
         });
         
-        console.log('✅ Verification result:', verified);
+        console.log('✅ Verification result:', verificationResult.success && verificationResult.result);
         
-        if (!verified) {
+        if (!verificationResult.success || !verificationResult.result) {
             return res.status(401).json({ error: 'Invalid 2FA code' });
         }
         
@@ -234,8 +248,16 @@ const disable2FA = async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
         
-        const isPasswordValid = await user.comparePassword(password);
-        if (!isPasswordValid) {
+        // Use worker thread for password verification
+        const passwordCheckResult = await authWorkerPool.executeTask({
+            operation: 'comparePassword',
+            data: {
+                password: password,
+                hash: user.password
+            }
+        });
+        
+        if (!passwordCheckResult.success || !passwordCheckResult.result) {
             return res.status(401).json({ error: 'Invalid password' });
         }
         
