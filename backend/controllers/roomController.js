@@ -214,16 +214,18 @@ const getAllRooms = async () => {
             return new Date() < new Date(room.expiresAt);
         });
         
-        // Return rooms without sensitive info
+        // Return rooms with PIN visible for users to join
         return activeRooms.map(room => ({
             roomId: room.roomId,
+            pin: room.pin, // PIN visible para que los usuarios puedan unirse
             name: room.name,
             type: room.type,
             participantCount: room.participants.length,
             maxParticipants: room.maxParticipants,
             isFull: room.participants.length >= room.maxParticipants,
             createdAt: room.createdAt,
-            expiresAt: room.expiresAt
+            expiresAt: room.expiresAt,
+            participants: room.participants // Incluir participantes para la UI
         }));
     } catch (error) {
         console.error('Error getting rooms:', error);

@@ -7,6 +7,7 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [showJoinForm, setShowJoinForm] = useState(false);
     const [roomName, setRoomName] = useState('');
+    const [roomType, setRoomType] = useState('text');
     const [maxParticipants, setMaxParticipants] = useState(5);
     const [pinToJoin, setPinToJoin] = useState('');
     const [error, setError] = useState('');
@@ -77,6 +78,7 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
 
         const newRoom = {
             name: roomName,
+            type: roomType,
             maxParticipants: parseInt(maxParticipants, 10),
             username,
             autoJoin: false
@@ -105,6 +107,7 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
         });
 
         setRoomName('');
+        setRoomType('text');
         setMaxParticipants(5);
         setShowCreateForm(false);
     };
@@ -213,6 +216,39 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
                         />
                     </div>
                     <div className="form-group">
+                        <label>Tipo de Sala:</label>
+                        <select 
+                            value={roomType} 
+                            onChange={(e) => setRoomType(e.target.value)}
+                            className="room-type-select"
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                border: '2px solid #667eea',
+                                borderRadius: '8px',
+                                fontSize: '14px',
+                                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                color: '#333',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease'
+                            }}
+                        >
+                            <option value="text">📝 Texto - Solo mensajes de texto</option>
+                            <option value="multimedia">🎨 Multimedia - Texto + Archivos (imágenes, PDFs, etc.)</option>
+                        </select>
+                        <small style={{ 
+                            display: 'block', 
+                            marginTop: '8px', 
+                            color: '#666',
+                            fontSize: '12px',
+                            lineHeight: '1.4'
+                        }}>
+                            {roomType === 'text' 
+                                ? '✓ Solo mensajes de texto encriptados' 
+                                : '✓ Mensajes de texto + Subida de archivos con detección de esteganografía y verificación de seguridad'}
+                        </small>
+                    </div>
+                    <div className="form-group">
                         <label>Máximo de Participantes:</label>
                         <input 
                             type="number" 
@@ -307,11 +343,47 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
                         {rooms.map(room => (
                             <li key={room.pin} className={`room-item ${currentRoom === room.pin ? 'active' : ''}`}>
                                 <div className="room-info">
-                                    <span className="room-name">{room.name}</span>
-                                    <span className="room-participants">
-                                        {room.participants ? room.participants.length : 0}/{room.maxParticipants} usuarios
-                                    </span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                        <div>
+                                            <span className="room-name">{room.name}</span>
+                                            <div style={{ fontSize: '0.85em', color: '#888', marginTop: '4px' }}>
+                                                {room.type === 'multimedia' ? '🎨 Multimedia' : '📝 Texto'}
+                                            </div>
+                                        </div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <div className="room-pin" style={{ 
+                                                fontSize: '0.9em', 
+                                                fontWeight: 'bold',
+                                                color: '#667eea',
+                                                marginBottom: '4px'
+                                            }}>
+                                                📌 PIN: {room.pin}
+                                            </div>
+                                            <span className="room-participants">
+                                                {room.participants ? room.participants.length : 0}/{room.maxParticipants} usuarios
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
+                                <button 
+                                    onClick={() => handleJoinRoomFromList(room.pin)}
+                                    className="join-room-button"
+                                    style={{
+                                        marginTop: '10px',
+                                        padding: '8px 16px',
+                                        backgroundColor: currentRoom === room.pin ? '#ccc' : '#667eea',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        cursor: currentRoom === room.pin ? 'not-allowed' : 'pointer',
+                                        fontSize: '0.9em',
+                                        width: '100%',
+                                        transition: 'all 0.3s ease'
+                                    }}
+                                    disabled={currentRoom === room.pin}
+                                >
+                                    {currentRoom === room.pin ? '✓ Ya estás en esta sala' : 'Unirse a la sala'}
+                                </button>
                             </li>
                         ))}
                     </ul>
