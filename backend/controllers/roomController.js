@@ -6,21 +6,22 @@ const logger = require('../utils/logger');
 const { AppError, asyncHandler } = require('../utils/errorHandler');
 
 // Create a new room
-const createRoom = asyncHandler(async (name, maxParticipants = 10, type = 'text', adminId = null, expiresIn = null, username = null) => {
-    // Use worker thread to generate room data in parallel
-    const roomDataResult = await roomWorkerPool.executeTask({
-        operation: 'generateRoomData',
-        data: {
-            name: name,
-            expiresIn: expiresIn
+const createRoom = async (name, maxParticipants = 10, type = 'text', adminId = null, expiresIn = null, username = null) => {
+    try {
+        // Use worker thread to generate room data in parallel
+        const roomDataResult = await roomWorkerPool.executeTask({
+            operation: 'generateRoomData',
+            data: {
+                name: name,
+                expiresIn: expiresIn
+            }
+        });
+        
+        if (!roomDataResult.success) {
+            throw new AppError(roomDataResult.error, 500);
         }
-    });
-    
-    if (!roomDataResult.success) {
-        throw new AppError(roomDataResult.error, 500);
-    }
-    
-    const { pin, roomId, encryptionKey, expiresAt } = roomDataResult.result;
+        
+        const { pin, roomId, encryptionKey, expiresAt } = roomDataResult.result;
     
     // Verify PIN is unique
     let uniquePin = pin;
@@ -55,34 +56,43 @@ const createRoom = asyncHandler(async (name, maxParticipants = 10, type = 'text'
         expiresAt
     });
     
-    await room.save();
-    
-    // Store ephemeral encryption key for the room
-    encryptionService.setRoomKey(uniquePin, Buffer.from(encryptionKey, 'hex'));
-    
-    logger.info('Room created', { name, pin: uniquePin, type, maxParticipants });
-    
-    return room;
-});
+        await room.save();
+        
+        // Store ephemeral encryption key for the room
+        encryptionService.setRoomKey(uniquePin, Buffer.from(encryptionKey, 'hex'));
+        
+        logger.info('Room created', { name, pin: uniquePin, type, maxParticipants });
+        
+        return room;
+    } catch (error) {
+        logger.error('Error creating room', { error: error.message, name });
+        throw error;
+    }
+};
 
 // Get a room by PIN
-const getRoomByPin = asyncHandler(async (pin) => {
-    const room = await Room.findOne({ pin, isActive: true });
-    
-    if (!room) {
-        return null;
+const getRoomByPin = async (pin) => {
+    try {
+        const room = await Room.findOne({ pin, isActive: true });
+        
+        if (!room) {
+            return null;
+        }
+        
+        // Check if room is expired
+        if (room.isExpired()) {
+            room.isActive = false;
+            await room.save();
+            logger.info('Room expired', { pin });
+            return null;
+        }
+        
+        return room;
+    } catch (error) {
+        logger.error('Error getting room by PIN', { error: error.message, pin });
+        throw error;
     }
-    
-    // Check if room is expired
-    if (room.isExpired()) {
-        room.isActive = false;
-        await room.save();
-        logger.info('Room expired', { pin });
-        return null;
-    }
-    
-    return room;
-});
+};
 
 // Verify room PIN
 const verifyRoomPin = asyncHandler(async (pin, providedPin) => {
@@ -113,22 +123,23 @@ const verifyRoomPin = asyncHandler(async (pin, providedPin) => {
 });
 
 // Add a participant to a room
-const addParticipant = asyncHandler(async (pin, socketId, username, ipAddress, deviceFingerprint) => {
-    // Validate participant data using worker thread
-    const validationResult = await roomWorkerPool.executeTask({
-        operation: 'validateParticipant',
-        data: {
-            username: username,
-            ipAddress: ipAddress
+const addParticipant = async (pin, socketId, username, ipAddress, deviceFingerprint) => {
+    try {
+        // Validate participant data using worker thread
+        const validationResult = await roomWorkerPool.executeTask({
+            operation: 'validateParticipant',
+            data: {
+                username: username,
+                ipAddress: ipAddress
+            }
+        });
+        
+        if (!validationResult.success || !validationResult.result.valid) {
+            return { 
+                success: false, 
+                message: validationResult.result.errors.join(', ') 
+            };
         }
-    });
-    
-    if (!validationResult.success || !validationResult.result.valid) {
-        return { 
-            success: false, 
-            message: validationResult.result.errors.join(', ') 
-        };
-    }
     
     const room = await Room.findOne({ pin, isActive: true });
     
@@ -171,22 +182,31 @@ const addParticipant = asyncHandler(async (pin, socketId, username, ipAddress, d
         logger.info('Participant added', { username, pin });
     }
     
-    await room.save();
-    return { success: true, room };
-});
+        await room.save();
+        return { success: true, room };
+    } catch (error) {
+        logger.error('Error adding participant', { error: error.message, pin, username });
+        return { success: false, message: error.message };
+    }
+};
 
 // Remove a participant from a room
-const removeParticipant = asyncHandler(async (socketId) => {
-    const rooms = await Room.find({ 'participants.socketId': socketId });
-    
-    for (const room of rooms) {
-        room.participants = room.participants.filter(p => p.socketId !== socketId);
-        await room.save();
-        logger.info('Participant removed', { socketId, roomPin: room.pin });
+const removeParticipant = async (socketId) => {
+    try {
+        const rooms = await Room.find({ 'participants.socketId': socketId });
+        
+        for (const room of rooms) {
+            room.participants = room.participants.filter(p => p.socketId !== socketId);
+            await room.save();
+            logger.info('Participant removed', { socketId, roomPin: room.pin });
+        }
+        
+        return true;
+    } catch (error) {
+        logger.error('Error removing participant', { error: error.message, socketId });
+        throw error;
     }
-    
-    return true;
-});
+};
 
 // Get all active rooms
 const getAllRooms = asyncHandler(async () => {
@@ -216,12 +236,13 @@ const getAllRooms = asyncHandler(async () => {
 });
 
 // Delete a room (admin only)
-const deleteRoom = asyncHandler(async (pin, adminId) => {
-    const room = await Room.findOne({ pin });
-    
-    if (!room) {
-        return { success: false, message: 'Room not found' };
-    }
+const deleteRoom = async (pin, adminId) => {
+    try {
+        const room = await Room.findOne({ pin });
+        
+        if (!room) {
+            return { success: false, message: 'Room not found' };
+        }
     
     // Clear room encryption key
     encryptionService.clearRoomKey(pin);
@@ -243,29 +264,38 @@ const deleteRoom = asyncHandler(async (pin, adminId) => {
         }
     });
     
-    logger.info('Room deleted', { pin, roomName: room.name, adminId });
-    
-    return { success: true, message: 'Room deleted successfully' };
-});
+        logger.info('Room deleted', { pin, roomName: room.name, adminId });
+        
+        return { success: true, message: 'Room deleted successfully' };
+    } catch (error) {
+        logger.error('Error deleting room', { error: error.message, pin });
+        return { success: false, message: error.message };
+    }
+};
 
 // Clean up expired rooms (scheduled task)
-const cleanupExpiredRooms = asyncHandler(async () => {
-    const expiredRooms = await Room.find({
-        isActive: true,
-        expiresAt: { $lt: new Date() }
-    });
-    
-    for (const room of expiredRooms) {
-        room.isActive = false;
-        await room.save();
+const cleanupExpiredRooms = async () => {
+    try {
+        const expiredRooms = await Room.find({
+            isActive: true,
+            expiresAt: { $lt: new Date() }
+        });
         
-        // Clear encryption key
-        encryptionService.clearRoomKey(room.pin);
+        for (const room of expiredRooms) {
+            room.isActive = false;
+            await room.save();
+            
+            // Clear encryption key
+            encryptionService.clearRoomKey(room.pin);
+        }
+        
+        logger.info('Expired rooms cleaned up', { count: expiredRooms.length });
+        return expiredRooms.length;
+    } catch (error) {
+        logger.error('Error cleaning up expired rooms', { error: error.message });
+        return 0;
     }
-    
-    logger.info('Expired rooms cleaned up', { count: expiredRooms.length });
-    return expiredRooms.length;
-});
+};
 
 module.exports = {
     createRoom,
