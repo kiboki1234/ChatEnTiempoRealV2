@@ -58,10 +58,24 @@ const createRoom = async (name, maxParticipants = 10, type = 'text', adminId = n
     
         await room.save();
         
+        // Verify room was saved
+        const savedRoom = await Room.findOne({ pin: uniquePin });
+        if (!savedRoom) {
+            throw new AppError('Room was not saved to database', 500);
+        }
+        
         // Store ephemeral encryption key for the room
         encryptionService.setRoomKey(uniquePin, Buffer.from(encryptionKey, 'hex'));
         
-        logger.info('Room created', { name, pin: uniquePin, type, maxParticipants });
+        logger.info('Room created and saved', { 
+            name, 
+            pin: uniquePin, 
+            roomId: room.roomId,
+            _id: room._id,
+            type, 
+            maxParticipants,
+            isActive: room.isActive 
+        });
         
         return room;
     } catch (error) {
@@ -210,9 +224,13 @@ const removeParticipant = async (socketId) => {
 
 // Get all active rooms
 const getAllRooms = asyncHandler(async () => {
+    logger.info('Getting all active rooms');
+    
     const rooms = await Room.find({ isActive: true })
-        .select('roomId pin name type maxParticipants participants createdAt expiresAt')
+        .select('roomId pin name type maxParticipants participants createdAt expiresAt createdByUsername')
         .lean();
+    
+    logger.info('Rooms found in database', { count: rooms.length });
     
     // Filter out expired rooms
     const activeRooms = rooms.filter(room => {
@@ -220,19 +238,25 @@ const getAllRooms = asyncHandler(async () => {
         return new Date() < new Date(room.expiresAt);
     });
     
+    logger.info('Active rooms after filtering', { count: activeRooms.length });
+    
     // Return rooms with PIN visible for users to join
-    return activeRooms.map(room => ({
+    const result = activeRooms.map(room => ({
         roomId: room.roomId,
         pin: room.pin, // PIN visible para que los usuarios puedan unirse
         name: room.name,
         type: room.type,
-        participantCount: room.participants.length,
+        participantCount: room.participants?.length || 0,
         maxParticipants: room.maxParticipants,
-        isFull: room.participants.length >= room.maxParticipants,
+        isFull: (room.participants?.length || 0) >= room.maxParticipants,
         createdAt: room.createdAt,
         expiresAt: room.expiresAt,
-        participants: room.participants // Incluir participantes para la UI
+        createdByUsername: room.createdByUsername,
+        participants: room.participants || [] // Incluir participantes para la UI
     }));
+    
+    logger.info('Returning rooms', { count: result.length });
+    return result;
 });
 
 // Delete a room (admin only)

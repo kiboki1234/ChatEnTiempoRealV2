@@ -149,10 +149,21 @@ const handleCreateRoom = (io) => async (socket, { name, maxParticipants, type, u
         });
 
         const roomObject = roomToObject(room);
+        
+        logger.info('Room created successfully', { 
+            roomName: name, 
+            pin: room.pin, 
+            roomId: room.roomId,
+            _id: room._id,
+            username,
+            isActive: room.isActive,
+            participantCount: room.participants?.length || 0
+        });
+        
         socket.emit('roomCreated', roomObject);
         io.emit('roomListUpdated', { action: 'created', room: roomObject });
-
-        logger.info('Room created', { roomName: name, pin: room.pin, username });
+        
+        logger.info('Room events emitted', { pin: room.pin });
     } catch (error) {
         logger.error('Error creating room', { error: error.message });
         socket.emit('roomCreationError', { 

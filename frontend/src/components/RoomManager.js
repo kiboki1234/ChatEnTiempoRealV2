@@ -18,10 +18,21 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
 
     useEffect(() => {
         // Cargar salas existentes
+        console.log('🔄 Cargando salas desde:', `${process.env.REACT_APP_SOCKET_SERVER_URL}/api/rooms`);
+        
         fetch(`${process.env.REACT_APP_SOCKET_SERVER_URL}/api/rooms`)
-            .then(response => response.json())
-            .then(data => setRooms(data))
-            .catch(err => console.error('Error loading rooms:', err));
+            .then(response => {
+                console.log('📡 Response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('✅ Salas cargadas:', data.length, 'salas', data);
+                setRooms(data);
+            })
+            .catch(err => {
+                console.error('❌ Error loading rooms:', err);
+                setError('Error al cargar las salas');
+            });
 
         // Escuchar eventos de sala
         socket.on('roomCreated', (room) => {
@@ -69,10 +80,19 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
 
         // Escuchar actualización de lista de salas
         socket.on('roomListUpdated', ({ action, room, pin }) => {
+            console.log('🔔 roomListUpdated event:', { action, room, pin });
             if (action === 'created') {
-                setRooms(prev => [...prev.filter(r => r.pin !== room.pin), room]);
+                setRooms(prev => {
+                    const updated = [...prev.filter(r => r.pin !== room.pin), room];
+                    console.log('➕ Sala agregada, total:', updated.length);
+                    return updated;
+                });
             } else if (action === 'deleted') {
-                setRooms(prev => prev.filter(r => r.pin !== pin));
+                setRooms(prev => {
+                    const updated = prev.filter(r => r.pin !== pin);
+                    console.log('➖ Sala eliminada, total:', updated.length);
+                    return updated;
+                });
             }
         });
 
