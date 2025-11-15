@@ -138,7 +138,7 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
             socket.off('roomListUpdated');
             socket.off('roomUpdated');
         };
-    }, [currentRoom, onJoinRoom]);
+    }, [currentRoom, onJoinRoom, username]);
 
     const handleCreateRoom = (e) => {
         e.preventDefault();

@@ -203,21 +203,25 @@ const handleCloseRoom = (io) => async (socket, { pin, username }) => {
         // Remove room from user's active rooms - CRITICAL: pass room._id not pin
         await UserService.removeUserRoom(username, room._id);
 
-        // Notify all users in the room
+        // IMPORTANT: Emit updates BEFORE disconnecting users
+        // 1. Notify all users in the room that it's being closed
         io.to(pin).emit('roomClosed', {
             message: 'La sala ha sido cerrada por el administrador',
             pin
         });
 
-        // Disconnect all users from the room
+        // 2. Notify ALL users (including those not in room) that room list updated
+        io.emit('roomListUpdated', { action: 'deleted', pin });
+
+        // 3. Notify the creator that room was closed successfully
+        socket.emit('roomClosedSuccess', { message: 'Sala cerrada exitosamente' });
+
+        // 4. NOW disconnect all users from the room
         const socketsInRoom = await io.in(pin).fetchSockets();
         for (const s of socketsInRoom) {
             s.leave(pin);
             socketRooms.delete(s.id);
         }
-
-        socket.emit('roomClosedSuccess', { message: 'Sala cerrada exitosamente' });
-        io.emit('roomListUpdated', { action: 'deleted', pin });
 
         logger.info('Room closed', { pin, username });
     } catch (error) {
