@@ -208,10 +208,11 @@ const verifyToken = async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
         
-        // Asegurar que el campo twoFactorEnabled exista
+        // NO resetear twoFactorEnabled - preservar el valor existente
+        // Solo inicializar si realmente no existe (primera vez)
         if (user.twoFactorEnabled === undefined || user.twoFactorEnabled === null) {
-            user.twoFactorEnabled = false;
-            await user.save();
+            // Solo leer, no modificar - el valor por defecto del schema es false
+            logger.warn('User twoFactorEnabled field is undefined', { username: user.username });
         }
         
         logger.info('Admin verified', { username: user.username, twoFactorEnabled: user.twoFactorEnabled });

@@ -251,10 +251,10 @@ router.get('/verify', async (req, res) => {
             return res.status(401).json({ error: 'Invalid token or inactive user' });
         }
 
-        // Asegurar que el campo twoFactorEnabled exista
+        // NO resetear twoFactorEnabled - preservar el valor existente
+        // El schema ya tiene un default: false, no es necesario forzarlo
         if (user.twoFactorEnabled === undefined || user.twoFactorEnabled === null) {
-            user.twoFactorEnabled = false;
-            await user.save();
+            console.warn('⚠️ User twoFactorEnabled field is undefined', { username: user.username });
         }
 
         console.log('✅ User verify endpoint - user data:', {

@@ -198,15 +198,26 @@ userSchema.statics.findOrCreateByUsername = async function(username, ipAddress, 
             username,
             ipAddress,
             deviceFingerprint,
-            role: 'user'
+            role: 'user',
+            twoFactorEnabled: false,
+            twoFactorSecret: null
         });
         await user.save();
     } else {
-        // Update last activity
-        user.lastActivity = new Date();
-        user.ipAddress = ipAddress;
-        user.deviceFingerprint = deviceFingerprint;
-        await user.save();
+        // Update SOLO lastActivity y tracking - NO tocar campos de seguridad como 2FA
+        // Usar updateOne para evitar triggers innecesarios y preservar todos los demás campos
+        await this.updateOne(
+            { _id: user._id },
+            { 
+                $set: { 
+                    lastActivity: new Date(),
+                    ipAddress,
+                    deviceFingerprint
+                }
+            }
+        );
+        // Recargar el usuario con los datos actualizados
+        user = await this.findOne({ username });
     }
     
     return user;

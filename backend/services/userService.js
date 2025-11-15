@@ -170,14 +170,14 @@ class UserService {
             let user = await User.findOne({ username })
                 .populate('activeRooms.roomId', 'name pin type createdAt');
             
-            // If user doesn't exist, create it automatically
+            // If user doesn't exist, create it using findOrCreateByUsername
+            // que maneja correctamente la inicialización de campos 2FA
             if (!user) {
                 try {
-                    user = new User({
-                        username,
-                        role: 'user'
-                    });
-                    await user.save();
+                    user = await User.findOrCreateByUsername(username, 'unknown', 'unknown');
+                    // Recargar con populate
+                    user = await User.findOne({ username })
+                        .populate('activeRooms.roomId', 'name pin type createdAt');
                 } catch (saveError) {
                     // If duplicate key error, try to find the user again
                     if (saveError.code === 11000) {
