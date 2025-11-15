@@ -3,6 +3,7 @@ import axios from 'axios';
 import { FaSmile, FaPaperPlane, FaTimes, FaImage, FaPaperclip, FaFilePdf, FaFileWord, FaFileExcel, FaFileVideo, FaFileAudio, FaFileArchive, FaFile, FaMicrophone, FaBars } from 'react-icons/fa';
 import EmojiPicker from 'emoji-picker-react';
 import socket from '../services/socketService';
+import { cryptoService } from '../services/cryptoService';
 import VoiceRecorder from './VoiceRecorder';
 import '../App.css';
 
@@ -133,12 +134,26 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin, roomInfo }) => {
             timestamp: new Date().toISOString(),
         };
 
-        console.log('📤 Enviando mensaje:', newMessage);
+        console.log('📤 Cifrando y enviando mensaje...');
+        
+        // Encrypt message with E2E encryption
+        try {
+            if (input) {
+                const encrypted = await cryptoService.encryptMessage(input, roomPin);
+                newMessage.encryptedMessage = encrypted;
+                newMessage.message = '[Cifrado E2E]'; // Placeholder, real message is encrypted
+                console.log('🔐 Mensaje cifrado con E2E');
+            }
+        } catch (error) {
+            console.error('❌ Error al cifrar mensaje:', error);
+            alert('Error al cifrar el mensaje. Verifica que estés en una sala con cifrado habilitado.');
+            return;
+        }
         
         // Emitir el mensaje a través del socket
         socket.emit('sendMessage', newMessage, (response) => {
             if (response && response.success) {
-                console.log('✅ Mensaje enviado con éxito');
+                console.log('✅ Mensaje cifrado enviado con éxito');
             } else {
                 console.error('❌ Error al enviar el mensaje:', response?.error || 'Error desconocido');
                 alert('Error al enviar el mensaje. Por favor, inténtalo de nuevo.');

@@ -13,13 +13,15 @@ const createMessage = async (data) => {
         username: data.username, 
         roomPin: data.roomPin,
         hasVoice: !!data.voiceUrl,
-        hasImage: !!data.imageUrl
+        hasImage: !!data.imageUrl,
+        isEncrypted: !!data.encryptedMessage
     });
     
     try {
         const message = new Message({
             username: data.username,
-            message: data.message,
+            message: data.message, // Placeholder or plain text
+            encryptedMessage: data.encryptedMessage || null, // E2E encrypted data
             imageUrl: data.imageUrl || null,
             voiceUrl: data.voiceUrl || null,
             voiceDuration: data.voiceDuration || null,
@@ -32,7 +34,8 @@ const createMessage = async (data) => {
         logger.info('Message saved', { 
             messageId: message._id, 
             username: data.username,
-            roomPin: data.roomPin 
+            roomPin: data.roomPin,
+            e2ee: !!data.encryptedMessage
         });
         
         // Populate replyTo if exists

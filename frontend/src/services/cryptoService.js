@@ -2,40 +2,57 @@ import sodium from 'libsodium-wrappers';
 
 class CryptoService {
   constructor() {
-    this.keyPair = null;
-    this.otherPublicKeys = new Map(); // Para almacenar claves públicas de otros usuarios
+    this.initialized = false;
+    this.roomKeys = new Map(); // Claves simétricas por sala
   }
 
   async initialize() {
+    if (this.initialized) return;
     await sodium.ready;
-    this.keyPair = sodium.crypto_box_keypair();
+    this.initialized = true;
   }
 
-  getPublicKey() {
-    if (!this.keyPair) throw new Error('CryptoService no inicializado');
-    return sodium.to_hex(this.keyPair.publicKey);
+  // Generar una clave simétrica para la sala (32 bytes)
+  generateRoomKey() {
+    return sodium.randombytes_buf(32);
   }
 
-  // Almacenar la clave pública de otro usuario
-  addOtherUserPublicKey(userId, publicKeyHex) {
-    const publicKey = sodium.from_hex(publicKeyHex);
-    this.otherPublicKeys.set(userId, publicKey);
+  // Establecer la clave de una sala
+  setRoomKey(roomPin, key) {
+    if (typeof key === 'string') {
+      // Si es hex string, convertir a Uint8Array
+      key = sodium.from_hex(key);
+    }
+    this.roomKeys.set(roomPin, key);
   }
 
-  // Cifrar un mensaje para un usuario específico
-  async encryptMessage(message, recipientId) {
-    await sodium.ready;
-    const publicKey = this.otherPublicKeys.get(recipientId);
-    if (!publicKey) {
-      throw new Error('Clave pública del destinatario no encontrada');
+  // Obtener la clave de una sala
+  getRoomKey(roomPin) {
+    return this.roomKeys.get(roomPin);
+  }
+
+  // Limpiar la clave de una sala
+  clearRoomKey(roomPin) {
+    this.roomKeys.delete(roomPin);
+  }
+
+  // Cifrar un mensaje para una sala (cifrado simétrico)
+  async encryptMessage(message, roomPin) {
+    await this.initialize();
+    
+    const key = this.getRoomKey(roomPin);
+    if (!key) {
+      throw new Error(`No hay clave de cifrado para la sala ${roomPin}`);
     }
 
-    const nonce = sodium.randombytes_buf(sodium.crypto_box_NONCEBYTES);
-    const ciphertext = sodium.crypto_box_easy(
-      message,
+    // Generar nonce aleatorio
+    const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
+    
+    // Cifrar con secretbox (cifrado simétrico autenticado)
+    const ciphertext = sodium.crypto_secretbox_easy(
+      sodium.from_string(message),
       nonce,
-      publicKey,
-      this.keyPair.privateKey
+      key
     );
 
     return {
@@ -44,22 +61,34 @@ class CryptoService {
     };
   }
 
-  // Descifrar un mensaje
-  async decryptMessage(encryptedData, senderId) {
-    await sodium.ready;
-    const publicKey = this.otherPublicKeys.get(senderId);
-    if (!publicKey) {
-      throw new Error('Clave pública del remitente no encontrada');
+  // Descifrar un mensaje de una sala
+  async decryptMessage(encryptedData, roomPin) {
+    await this.initialize();
+    
+    const key = this.getRoomKey(roomPin);
+    if (!key) {
+      throw new Error(`No hay clave de cifrado para la sala ${roomPin}`);
     }
 
-    const message = sodium.crypto_box_open_easy(
-      sodium.from_hex(encryptedData.ciphertext),
-      sodium.from_hex(encryptedData.nonce),
-      publicKey,
-      this.keyPair.privateKey
-    );
+    try {
+      const plaintext = sodium.crypto_secretbox_open_easy(
+        sodium.from_hex(encryptedData.ciphertext),
+        sodium.from_hex(encryptedData.nonce),
+        key
+      );
 
-    return sodium.to_string(message);
+      return sodium.to_string(plaintext);
+    } catch (error) {
+      console.error('Error descifrando mensaje:', error);
+      throw new Error('No se pudo descifrar el mensaje');
+    }
+  }
+
+  // Exportar clave de sala como hex (para compartir)
+  exportRoomKey(roomPin) {
+    const key = this.getRoomKey(roomPin);
+    if (!key) return null;
+    return sodium.to_hex(key);
   }
 }
 

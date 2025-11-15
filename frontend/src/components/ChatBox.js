@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import socket from '../services/socketService';
+import { cryptoService } from '../services/cryptoService';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import RoomManager from './RoomManager';
@@ -149,9 +150,19 @@ const ChatBox = ({ initialRoomPin }) => {
         }
 
         // Escuchar eventos de sala
-        socket.on('roomJoined', (room) => {
+        socket.on('roomJoined', async (room) => {
+            console.log('🔐 Sala unida con cifrado E2E:', room.pin);
             setCurrentRoom(room.pin);
             setRoomInfo(room);
+            
+            // Initialize crypto service and set room encryption key
+            if (room.encryptionKey) {
+                await cryptoService.initialize();
+                cryptoService.setRoomKey(room.pin, room.encryptionKey);
+                console.log('✅ Clave de cifrado E2E establecida para sala', room.pin);
+            } else {
+                console.warn('⚠️ No se recibió clave de cifrado para la sala');
+            }
             
             if (room.participants) {
                 setParticipants(room.participants);
@@ -160,9 +171,31 @@ const ChatBox = ({ initialRoomPin }) => {
             // Cargar mensajes de la sala
             fetch(`${process.env.REACT_APP_SOCKET_SERVER_URL}/api/chat?roomPin=${room.pin}`)
                 .then(response => response.json())
-                .then(data => {
-                    setMessages(data);
+                .then(async (data) => {
+                    // Decrypt historical messages
+                    const decryptedMessages = await Promise.all(
+                        data.map(async (msg) => {
+                            if (msg.encryptedMessage) {
+                                try {
+                                    const decrypted = await cryptoService.decryptMessage(
+                                        msg.encryptedMessage,
+                                        room.pin
+                                    );
+                                    msg.message = decrypted;
+                                } catch (error) {
+                                    console.error('❌ Error descifrando mensaje histórico:', error);
+                                    msg.message = '[Error: No se pudo descifrar]';
+                                }
+                            }
+                            return msg;
+                        })
+                    );
+                    setMessages(decryptedMessages);
+                    console.log('📜 Mensajes históricos descifrados:', decryptedMessages.length);
                 })
+                .catch(error => {
+                    console.error('Error cargando mensajes:', error);
+                });
         });
 
         socket.on('userJoined', ({ username: joinedUser, room, participants }) => {
@@ -190,8 +223,23 @@ const ChatBox = ({ initialRoomPin }) => {
             setParticipants([]);
         });
 
-        socket.on('receiveMessage', (message) => {
+        socket.on('receiveMessage', async (message) => {
             if (message.roomPin === currentRoom) {
+                // Decrypt message if it's encrypted
+                if (message.encryptedMessage) {
+                    try {
+                        const decrypted = await cryptoService.decryptMessage(
+                            message.encryptedMessage,
+                            currentRoom
+                        );
+                        message.message = decrypted;
+                        console.log('🔓 Mensaje descifrado');
+                    } catch (error) {
+                        console.error('❌ Error descifrando mensaje:', error);
+                        message.message = '[Error: No se pudo descifrar el mensaje]';
+                    }
+                }
+                
                 setMessages((prev) => [...prev, message]);
                 if (message.username !== username) {
                     sendNotification(message);

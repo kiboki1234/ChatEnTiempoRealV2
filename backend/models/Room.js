@@ -79,7 +79,12 @@ const roomSchema = new mongoose.Schema({
     },
     expiresAt: {
         type: Date,
-        default: null
+        default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
+    },
+    encryptionKey: {
+        type: String,
+        required: true,
+        select: false // Don't return by default in queries for security
     },
     participants: [{
         socketId: String,

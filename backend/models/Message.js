@@ -2,7 +2,11 @@ const mongoose = require('mongoose');
 
 const messageSchema = new mongoose.Schema({
     username: String,
-    message: String,
+    message: String, // Plain text (placeholder for E2E encrypted messages)
+    encryptedMessage: {
+        ciphertext: String,
+        nonce: String
+    }, // E2E encrypted message data
     sticker: String,
     imageUrl: String,
     voiceUrl: String,

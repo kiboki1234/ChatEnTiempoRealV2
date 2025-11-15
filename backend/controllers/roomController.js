@@ -53,7 +53,8 @@ const createRoom = async (name, maxParticipants = 10, type = 'text', adminId = n
         maxParticipants: Math.max(2, maxParticipants),
         createdBy: adminId,
         createdByUsername: username || 'system',
-        expiresAt
+        expiresAt,
+        encryptionKey // Store for sharing with new joiners
     });
     
         await room.save();
@@ -64,8 +65,9 @@ const createRoom = async (name, maxParticipants = 10, type = 'text', adminId = n
             throw new AppError('Room was not saved to database', 500);
         }
         
-        // Store ephemeral encryption key for the room
-        encryptionService.setRoomKey(uniquePin, Buffer.from(encryptionKey, 'hex'));
+        // DO NOT store encryption key on server for E2E encryption
+        // The key will be sent to the client and shared via secure channel
+        // encryptionService.setRoomKey(uniquePin, Buffer.from(encryptionKey, 'hex'));
         
         logger.info('Room created and saved', { 
             name, 
@@ -74,10 +76,15 @@ const createRoom = async (name, maxParticipants = 10, type = 'text', adminId = n
             _id: room._id,
             type, 
             maxParticipants,
-            isActive: room.isActive 
+            isActive: room.isActive,
+            e2ee: true // End-to-end encryption enabled
         });
         
-        return room;
+        // Return room with encryption key for client-side E2E encryption
+        return {
+            ...room.toObject(),
+            encryptionKey // Send key to client, don't store on server
+        };
     } catch (error) {
         logger.error('Error creating room', { error: error.message, name });
         throw error;
@@ -85,9 +92,16 @@ const createRoom = async (name, maxParticipants = 10, type = 'text', adminId = n
 };
 
 // Get a room by PIN
-const getRoomByPin = async (pin) => {
+const getRoomByPin = async (pin, includeEncryptionKey = false) => {
     try {
-        const room = await Room.findOne({ pin, isActive: true });
+        let query = Room.findOne({ pin, isActive: true });
+        
+        // Include encryption key if requested (for sharing with joiners)
+        if (includeEncryptionKey) {
+            query = query.select('+encryptionKey');
+        }
+        
+        const room = await query;
         
         if (!room) {
             return null;

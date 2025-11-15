@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import socket from '../services/socketService';
+import { cryptoService } from '../services/cryptoService';
 import '../App.css';
 
 const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
@@ -156,8 +157,15 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
         };
 
         // Escuchar el evento de sala creada
-        const onRoomCreated = (room) => {
+        const onRoomCreated = async (room) => {
             if (room.autoJoin) return; 
+            
+            // Store encryption key for E2E encryption
+            if (room.encryptionKey) {
+                await cryptoService.initialize();
+                cryptoService.setRoomKey(room.pin, room.encryptionKey);
+                console.log('🔐 Clave de cifrado E2E guardada para sala creada:', room.pin);
+            }
             
             // Generar el enlace de la sala con el PIN correcto
             const roomLink = `${window.location.origin}?room=${encodeURIComponent(room.name)}&pin=${room.pin}`;

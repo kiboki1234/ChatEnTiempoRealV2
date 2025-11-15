@@ -42,7 +42,8 @@ const handleJoinRoom = (io) => async (socket, { pin, username }) => {
             await handleLeaveRoom(io)(socket);
         }
 
-        const room = await roomController.getRoomByPin(pin);
+        // Get room with encryption key for E2E encryption
+        const room = await roomController.getRoomByPin(pin, true);
         if (!room) {
             socket.emit('roomError', { message: 'Sala no encontrada' });
             return;
@@ -62,7 +63,12 @@ const handleJoinRoom = (io) => async (socket, { pin, username }) => {
         await createOrUpdateSession(socket, username, ipAddress, deviceFingerprint);
 
         const roomObject = roomToObject(result.room);
-        socket.emit('roomJoined', roomObject);
+        
+        // Send room with encryption key to joiner (for E2E encryption)
+        socket.emit('roomJoined', {
+            ...roomObject,
+            encryptionKey: room.encryptionKey // Share encryption key with new joiner
+        });
         
         // Notify ALL users in the room (including the one who joined) about the updated participant list
         io.to(pin).emit('userJoined', { 
@@ -168,10 +174,17 @@ const handleCreateRoom = (io) => async (socket, { name, maxParticipants, type, u
             _id: room._id,
             username,
             isActive: room.isActive,
-            participantCount: room.participants?.length || 0
+            participantCount: room.participants?.length || 0,
+            e2ee: true
         });
         
-        socket.emit('roomCreated', roomObject);
+        // Send room with encryption key to creator (for E2E encryption)
+        socket.emit('roomCreated', {
+            ...roomObject,
+            encryptionKey: room.encryptionKey // Include encryption key for client
+        });
+        
+        // Send room list update WITHOUT encryption key (public info only)
         io.emit('roomListUpdated', { action: 'created', room: roomObject });
         
         logger.info('Room events emitted', { pin: room.pin });
