@@ -202,6 +202,19 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
         onJoinRoom(pin);
     };
 
+    // Function to copy room link
+    const copyRoomLink = (roomName, pin) => {
+        const roomLink = `${window.location.origin}?room=${encodeURIComponent(roomName)}&pin=${pin}`;
+        navigator.clipboard.writeText(roomLink).then(() => {
+            setSuccess(`¡Enlace copiado al portapapeles!`);
+            setTimeout(() => setSuccess(''), 3000);
+        }).catch(err => {
+            console.error('Error al copiar:', err);
+            setError('Error al copiar el enlace');
+            setTimeout(() => setError(''), 3000);
+        });
+    };
+
     // Check if user is a guest
     const isGuest = username && username.startsWith('guest_');
 
@@ -411,52 +424,101 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
                     <p>No hay salas disponibles</p>
                 ) : (
                     <ul>
-                        {rooms.map(room => (
-                            <li key={room.pin} className={`room-item ${currentRoom === room.pin ? 'active' : ''}`}>
-                                <div className="room-info">
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                                        <div>
-                                            <span className="room-name">{room.name}</span>
-                                            <div style={{ fontSize: '0.85em', color: '#888', marginTop: '4px' }}>
-                                                {room.type === 'multimedia' ? '🎨 Multimedia' : '📝 Texto'}
+                        {rooms.map(room => {
+                            const roomLink = `${window.location.origin}?room=${encodeURIComponent(room.name)}&pin=${room.pin}`;
+                            return (
+                                <li key={room.pin} className={`room-item ${currentRoom === room.pin ? 'active' : ''}`}>
+                                    <div className="room-info">
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                            <div>
+                                                <span className="room-name">{room.name}</span>
+                                                <div style={{ fontSize: '0.85em', color: '#888', marginTop: '4px' }}>
+                                                    {room.type === 'multimedia' ? '🎨 Multimedia' : '📝 Texto'}
+                                                </div>
+                                            </div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <div className="room-pin" style={{ 
+                                                    fontSize: '0.9em', 
+                                                    fontWeight: 'bold',
+                                                    color: '#667eea',
+                                                    marginBottom: '4px'
+                                                }}>
+                                                    📌 PIN: {room.pin}
+                                                </div>
+                                                <span className="room-participants">
+                                                    {room.participants ? room.participants.length : 0}/{room.maxParticipants} usuarios
+                                                </span>
                                             </div>
                                         </div>
-                                        <div style={{ textAlign: 'right' }}>
-                                            <div className="room-pin" style={{ 
-                                                fontSize: '0.9em', 
-                                                fontWeight: 'bold',
-                                                color: '#667eea',
-                                                marginBottom: '4px'
-                                            }}>
-                                                📌 PIN: {room.pin}
-                                            </div>
-                                            <span className="room-participants">
-                                                {room.participants ? room.participants.length : 0}/{room.maxParticipants} usuarios
-                                            </span>
+                                        
+                                        {/* Room URL with copy button */}
+                                        <div style={{ 
+                                            marginTop: '12px', 
+                                            padding: '8px', 
+                                            backgroundColor: '#f5f5f5', 
+                                            borderRadius: '6px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px'
+                                        }}>
+                                            <input
+                                                type="text"
+                                                value={roomLink}
+                                                readOnly
+                                                style={{
+                                                    flex: 1,
+                                                    padding: '6px 10px',
+                                                    fontSize: '0.85em',
+                                                    border: '1px solid #ddd',
+                                                    borderRadius: '4px',
+                                                    backgroundColor: 'white',
+                                                    color: '#555'
+                                                }}
+                                                onClick={(e) => e.target.select()}
+                                            />
+                                            <button
+                                                onClick={() => copyRoomLink(room.name, room.pin)}
+                                                style={{
+                                                    padding: '6px 12px',
+                                                    backgroundColor: '#667eea',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '4px',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.85em',
+                                                    whiteSpace: 'nowrap',
+                                                    transition: 'all 0.3s ease'
+                                                }}
+                                                onMouseOver={(e) => e.target.style.backgroundColor = '#5568d3'}
+                                                onMouseOut={(e) => e.target.style.backgroundColor = '#667eea'}
+                                                title="Copiar enlace"
+                                            >
+                                                📋 Copiar
+                                            </button>
                                         </div>
                                     </div>
-                                </div>
-                                <button 
-                                    onClick={() => handleJoinRoomFromList(room.pin)}
-                                    className="join-room-button"
-                                    style={{
-                                        marginTop: '10px',
-                                        padding: '8px 16px',
-                                        backgroundColor: currentRoom === room.pin ? '#ccc' : '#667eea',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        cursor: currentRoom === room.pin ? 'not-allowed' : 'pointer',
-                                        fontSize: '0.9em',
-                                        width: '100%',
-                                        transition: 'all 0.3s ease'
-                                    }}
-                                    disabled={currentRoom === room.pin}
-                                >
-                                    {currentRoom === room.pin ? '✓ Ya estás en esta sala' : 'Unirse a la sala'}
-                                </button>
-                            </li>
-                        ))}
+                                    <button 
+                                        onClick={() => handleJoinRoomFromList(room.pin)}
+                                        className="join-room-button"
+                                        style={{
+                                            marginTop: '10px',
+                                            padding: '8px 16px',
+                                            backgroundColor: currentRoom === room.pin ? '#ccc' : '#667eea',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            cursor: currentRoom === room.pin ? 'not-allowed' : 'pointer',
+                                            fontSize: '0.9em',
+                                            width: '100%',
+                                            transition: 'all 0.3s ease'
+                                        }}
+                                        disabled={currentRoom === room.pin}
+                                    >
+                                        {currentRoom === room.pin ? '✓ Ya estás en esta sala' : 'Unirse a la sala'}
+                                    </button>
+                                </li>
+                            );
+                        })}
                     </ul>
                 )}
             </div>
