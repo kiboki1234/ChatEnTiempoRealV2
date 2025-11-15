@@ -8,15 +8,7 @@ const { roomCreationLimiter } = require('../middlewares/rateLimitMiddleware');
 const AuditLog = require('../models/AuditLog');
 
 // Get all rooms (public)
-router.get('/', async (req, res) => {
-    try {
-        const rooms = await roomController.getAllRooms();
-        res.status(200).json(rooms);
-    } catch (error) {
-        console.error('Error getting rooms:', error);
-        res.status(500).json({ error: 'Error getting rooms' });
-    }
-});
+router.get('/', roomController.getAllRooms);
 
 // Get room by PIN (requires PIN verification)
 router.post('/verify', validateRoomPin, async (req, res) => {

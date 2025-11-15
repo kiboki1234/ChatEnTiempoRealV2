@@ -223,7 +223,7 @@ const removeParticipant = async (socketId) => {
 };
 
 // Get all active rooms
-const getAllRooms = asyncHandler(async () => {
+const getAllRooms = asyncHandler(async (req, res) => {
     logger.info('Getting all active rooms');
     
     const rooms = await Room.find({ isActive: true })
@@ -256,7 +256,7 @@ const getAllRooms = asyncHandler(async () => {
     }));
     
     logger.info('Returning rooms', { count: result.length });
-    return result;
+    res.status(200).json(result);
 });
 
 // Delete a room (admin only)
