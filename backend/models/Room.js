@@ -83,7 +83,7 @@ const roomSchema = new mongoose.Schema({
     },
     encryptionKey: {
         type: String,
-        required: true,
+        required: false, // Optional for backward compatibility with old rooms
         select: false // Don't return by default in queries for security
     },
     participants: [{

@@ -104,6 +104,99 @@ node scripts/promoteUser.js john_doe
 
 ## 🔧 Mantenimiento General
 
+### `migrateToE2E.js` ⭐ CRÍTICO
+**Propósito:** Migrar salas y mensajes antiguos a cifrado E2E.
+
+**Uso:**
+```bash
+node scripts/migrateToE2E.js
+```
+
+**Qué hace:**
+- ✅ Genera claves de cifrado para salas sin clave (creadas antes del cifrado E2E)
+- ✅ Cifra TODOS los mensajes históricos usando las claves generadas
+- ✅ Actualiza mensajes con formato cifrado (ciphertext + nonce)
+- ✅ Verifica la migración completa
+- ✅ Muestra estadísticas detalladas del proceso
+
+**⚠️ MUY IMPORTANTE:**
+- **Esta operación es IRREVERSIBLE**: Una vez cifrados, los mensajes no pueden volver a texto plano
+- **Hacer BACKUP de la BD antes**: Usar `mongodump` o similar
+- **Solo ejecutar UNA VEZ**: El script no es idempotente
+- **Requiere confirmación**: Pide escribir "SI" para continuar
+- **Tiempo de ejecución**: Puede tardar varios minutos con muchos mensajes
+
+**Cuándo ejecutar:**
+- **Después de implementar el cifrado E2E por primera vez**
+- Si tienes salas/mensajes anteriores a la implementación de cifrado
+- Para solucionar errores de "No se pudo descifrar el mensaje" en salas viejas
+
+**Ejemplo de salida:**
+```
+🔐 Iniciando migración a cifrado E2E...
+
+🔄 Conectando a MongoDB...
+✅ Conectado a MongoDB
+
+✅ Libsodium inicializado
+
+📊 Buscando salas sin cifrado...
+✅ Encontradas 5 salas sin cifrado
+
+🔑 Generando claves de cifrado para salas...
+  ✅ Sala 123456 (Sala General): Clave generada
+  ✅ Sala 789012 (Proyecto X): Clave generada
+  ...
+
+✅ 5 salas actualizadas con claves de cifrado
+
+📊 Buscando mensajes sin cifrar...
+✅ Encontrados 1250 mensajes sin cifrar
+
+🔐 Cifrando mensajes...
+  📦 Progreso: 100 mensajes cifrados...
+  📦 Progreso: 200 mensajes cifrados...
+  ...
+
+============================================================
+📊 RESUMEN DE MIGRACIÓN
+============================================================
+✅ Salas actualizadas con claves: 5
+🔐 Mensajes cifrados: 1245
+⚠️  Mensajes omitidos: 5
+❌ Errores: 0
+============================================================
+
+🔍 Verificando migración...
+
+📊 Estado final:
+   Salas totales: 8
+   Salas con cifrado: 8 (100.0%)
+   Mensajes totales: 1245
+   Mensajes cifrados: 1245 (100.0%)
+
+✅ ¡Migración completada exitosamente!
+🔐 Todos los mensajes y salas ahora tienen cifrado E2E
+```
+
+**Antes de ejecutar:**
+```bash
+# 1. HACER BACKUP
+mongodump --uri="tu-uri-mongodb" --out=./backup-pre-e2e
+
+# 2. Verificar que tienes libsodium-wrappers instalado
+npm list libsodium-wrappers
+
+# 3. Ejecutar el script
+node scripts/migrateToE2E.js
+```
+
+**Si algo sale mal:**
+```bash
+# Restaurar desde el backup
+mongorestore --uri="tu-uri-mongodb" ./backup-pre-e2e
+```
+
 ### `syncRoomCounts.js` ⭐ NUEVO
 **Propósito:** Sincronizar contadores de salas activas con la realidad de la base de datos.
 

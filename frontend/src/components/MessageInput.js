@@ -134,26 +134,28 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin, roomInfo }) => {
             timestamp: new Date().toISOString(),
         };
 
-        console.log('📤 Cifrando y enviando mensaje...');
+        console.log('📤 Preparando mensaje para enviar...');
         
-        // Encrypt message with E2E encryption
+        // Encrypt message with E2E encryption if room has encryption key
         try {
-            if (input) {
+            if (input && cryptoService.getRoomKey(roomPin)) {
                 const encrypted = await cryptoService.encryptMessage(input, roomPin);
                 newMessage.encryptedMessage = encrypted;
-                newMessage.message = '[Cifrado E2E]'; // Placeholder, real message is encrypted
+                newMessage.message = '[Cifrado E2E]'; // Placeholder
                 console.log('🔐 Mensaje cifrado con E2E');
+            } else if (input && !cryptoService.getRoomKey(roomPin)) {
+                console.log('⚠️ Sala sin cifrado E2E - enviando mensaje en texto plano');
             }
         } catch (error) {
             console.error('❌ Error al cifrar mensaje:', error);
-            alert('Error al cifrar el mensaje. Verifica que estés en una sala con cifrado habilitado.');
-            return;
+            // Continue without encryption if error occurs
+            console.log('⚠️ Enviando mensaje sin cifrar debido a error');
         }
         
         // Emitir el mensaje a través del socket
         socket.emit('sendMessage', newMessage, (response) => {
             if (response && response.success) {
-                console.log('✅ Mensaje cifrado enviado con éxito');
+                console.log('✅ Mensaje enviado con éxito');
             } else {
                 console.error('❌ Error al enviar el mensaje:', response?.error || 'Error desconocido');
                 alert('Error al enviar el mensaje. Por favor, inténtalo de nuevo.');

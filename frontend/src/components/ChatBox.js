@@ -172,26 +172,28 @@ const ChatBox = ({ initialRoomPin }) => {
             fetch(`${process.env.REACT_APP_SOCKET_SERVER_URL}/api/chat?roomPin=${room.pin}`)
                 .then(response => response.json())
                 .then(async (data) => {
-                    // Decrypt historical messages
+                    // Decrypt historical messages (only if they have encrypted data)
                     const decryptedMessages = await Promise.all(
                         data.map(async (msg) => {
-                            if (msg.encryptedMessage) {
+                            if (msg.encryptedMessage && msg.encryptedMessage.ciphertext && msg.encryptedMessage.nonce) {
                                 try {
                                     const decrypted = await cryptoService.decryptMessage(
                                         msg.encryptedMessage,
                                         room.pin
                                     );
                                     msg.message = decrypted;
+                                    console.log('🔓 Mensaje histórico descifrado');
                                 } catch (error) {
                                     console.error('❌ Error descifrando mensaje histórico:', error);
                                     msg.message = '[Error: No se pudo descifrar]';
                                 }
                             }
+                            // Si no tiene encryptedMessage, usar el mensaje en texto plano (legacy)
                             return msg;
                         })
                     );
                     setMessages(decryptedMessages);
-                    console.log('📜 Mensajes históricos descifrados:', decryptedMessages.length);
+                    console.log('📜 Mensajes cargados:', decryptedMessages.length);
                 })
                 .catch(error => {
                     console.error('Error cargando mensajes:', error);
@@ -225,20 +227,21 @@ const ChatBox = ({ initialRoomPin }) => {
 
         socket.on('receiveMessage', async (message) => {
             if (message.roomPin === currentRoom) {
-                // Decrypt message if it's encrypted
-                if (message.encryptedMessage) {
+                // Decrypt message if it's encrypted (has valid encrypted data)
+                if (message.encryptedMessage && message.encryptedMessage.ciphertext && message.encryptedMessage.nonce) {
                     try {
                         const decrypted = await cryptoService.decryptMessage(
                             message.encryptedMessage,
                             currentRoom
                         );
                         message.message = decrypted;
-                        console.log('🔓 Mensaje descifrado');
+                        console.log('🔓 Mensaje descifrado en tiempo real');
                     } catch (error) {
                         console.error('❌ Error descifrando mensaje:', error);
                         message.message = '[Error: No se pudo descifrar el mensaje]';
                     }
                 }
+                // Si no tiene encryptedMessage, usar el mensaje en texto plano (legacy)
                 
                 setMessages((prev) => [...prev, message]);
                 if (message.username !== username) {
