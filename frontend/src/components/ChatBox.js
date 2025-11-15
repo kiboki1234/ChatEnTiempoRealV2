@@ -45,21 +45,46 @@ const ChatBox = ({ initialRoomPin }) => {
         }
     }, [darkMode]);
 
-    const generateUsername = () => {
+    const checkAuthentication = () => {
         const storedUsername = localStorage.getItem('username');
+        const token = localStorage.getItem('userToken');
+        const isGuest = localStorage.getItem('isGuest') === 'true';
+        
         if (storedUsername) {
-            return storedUsername;
+            setUsername(storedUsername);
+            setIsAuthenticated(true);
+            // Si tiene token de usuario registrado, establecer rol
+            if (token && !isGuest) {
+                const role = localStorage.getItem('userRole') || 'user';
+                setUserRole(role);
+            }
+            return true;
         } else {
             // Si no hay username, mostrar modal de autenticación
             setShowAuthModal(true);
-            return '';
+            return false;
         }
     };
 
     const handleAuthSuccess = (authData) => {
+        console.log('✅ Autenticación exitosa:', authData);
+        
+        // Guardar datos de autenticación
         setUsername(authData.username);
         setUserRole(authData.role || 'user');
         setIsAuthenticated(true);
+        
+        // Guardar en localStorage
+        localStorage.setItem('username', authData.username);
+        if (authData.token) {
+            localStorage.setItem('userToken', authData.token);
+            localStorage.setItem('userRole', authData.role || 'user');
+            localStorage.setItem('isGuest', 'false');
+        } else {
+            // Es invitado
+            localStorage.setItem('isGuest', 'true');
+        }
+        
         setShowAuthModal(false);
         
         // Si hay una sala pendiente de unirse (desde URL)
@@ -106,10 +131,12 @@ const ChatBox = ({ initialRoomPin }) => {
     };
 
     useEffect(() => {
-        // Initialize username only once
-        if (!username) {
-            const currentUsername = generateUsername();
-            setUsername(currentUsername);
+        // Verificar autenticación al cargar el componente
+        const isAuth = checkAuthentication();
+        
+        // Si NO está autenticado, no hacer nada más hasta que inicie sesión
+        if (!isAuth) {
+            console.log('❌ Usuario no autenticado, mostrando modal de login');
         }
     }, []);
 
@@ -291,16 +318,19 @@ const ChatBox = ({ initialRoomPin }) => {
                 />
             )}
 
-            {/* Admin Panel Modal */}
-            {showAdminPanel && (
-                <AdminPanel
-                    userToken={localStorage.getItem('userToken')}
-                    userRole={userRole}
-                    onClose={() => setShowAdminPanel(false)}
-                />
-            )}
-            
-            <div className="content-container">
+            {/* Solo mostrar el chat si el usuario está autenticado */}
+            {!showAuthModal && username && (
+                <>
+                    {/* Admin Panel Modal */}
+                    {showAdminPanel && (
+                        <AdminPanel
+                            userToken={localStorage.getItem('userToken')}
+                            userRole={userRole}
+                            onClose={() => setShowAdminPanel(false)}
+                        />
+                    )}
+                    
+                    <div className="content-container">
                 {ADS_ENABLED && (
                     <div className="ad-container ad-left">
                         <ins className="adsbygoogle"
@@ -411,6 +441,8 @@ const ChatBox = ({ initialRoomPin }) => {
                     </div>
                 )}
             </div>
+                </>
+            )}
         </div>
     );
 };
