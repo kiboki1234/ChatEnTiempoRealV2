@@ -63,7 +63,9 @@ const handleJoinRoom = (io) => async (socket, { pin, username }) => {
 
         const roomObject = roomToObject(result.room);
         socket.emit('roomJoined', roomObject);
-        socket.to(pin).emit('userJoined', { 
+        
+        // Notify ALL users in the room (including the one who joined) about the updated participant list
+        io.to(pin).emit('userJoined', { 
             username, 
             room: roomObject,
             participants: result.room.participants 
@@ -84,17 +86,26 @@ const handleLeaveRoom = (io) => async (socket) => {
     try {
         const roomPin = socketRooms.get(socket.id);
         if (roomPin) {
+            // Get room BEFORE removing participant to know who left
+            const roomBefore = await roomController.getRoomByPin(roomPin);
+            const leavingUser = roomBefore?.participants.find(p => p.socketId === socket.id);
+            
             socket.leave(roomPin);
             await roomController.removeParticipant(socket.id);
             socketRooms.delete(socket.id);
             
             const room = await roomController.getRoomByPin(roomPin);
             if (room) {
-                emitRoomUpdate(io, room);
-                // Notify remaining users that someone left
+                const roomObject = roomToObject(room);
+                
+                // Notify remaining users that someone left with updated participants
                 io.to(roomPin).emit('userLeft', { 
+                    username: leavingUser?.username,
+                    room: roomObject,
                     participants: room.participants 
                 });
+                
+                emitRoomUpdate(io, room);
             }
             
             // Notify the user who left

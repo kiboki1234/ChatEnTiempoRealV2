@@ -138,12 +138,24 @@ const ChatBox = ({ initialRoomPin }) => {
                 })
         });
 
-        socket.on('userJoined', ({ participants }) => {
-            setParticipants(participants);
+        socket.on('userJoined', ({ username: joinedUser, room, participants }) => {
+            console.log('👤 Usuario unido:', joinedUser, 'Participantes:', participants?.length);
+            if (participants) {
+                setParticipants(participants);
+            }
+            if (room) {
+                setRoomInfo(room);
+            }
         });
 
-        socket.on('userLeft', ({ participants }) => {
-            setParticipants(participants);
+        socket.on('userLeft', ({ username: leftUser, room, participants }) => {
+            console.log('👋 Usuario salió:', leftUser, 'Participantes restantes:', participants?.length);
+            if (participants) {
+                setParticipants(participants);
+            }
+            if (room) {
+                setRoomInfo(room);
+            }
         });
 
         socket.on('roomLeft', () => {
