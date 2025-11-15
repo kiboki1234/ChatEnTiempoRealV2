@@ -208,6 +208,11 @@ const ChatBox = ({ initialRoomPin }) => {
             }
             if (room) {
                 setRoomInfo(room);
+                // Update encryption key if provided (important for participants already in room)
+                if (room.encryptionKey && room.pin) {
+                    cryptoService.setRoomKey(room.pin, room.encryptionKey);
+                    console.log('🔑 Clave de cifrado actualizada desde userJoined para sala', room.pin);
+                }
             }
         });
 

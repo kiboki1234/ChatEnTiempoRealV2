@@ -71,9 +71,13 @@ const handleJoinRoom = (io) => async (socket, { pin, username }) => {
         });
         
         // Notify ALL users in the room (including the one who joined) about the updated participant list
+        // Include encryption key so all participants can decrypt messages
         io.to(pin).emit('userJoined', { 
             username, 
-            room: roomObject,
+            room: {
+                ...roomObject,
+                encryptionKey: room.encryptionKey // Share encryption key with all participants
+            },
             participants: result.room.participants 
         });
 
