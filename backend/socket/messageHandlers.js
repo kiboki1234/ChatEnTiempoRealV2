@@ -57,7 +57,11 @@ const handleSendMessage = (io) => async (socket, data, callback) => {
         
         const message = await createMessage(messageData);
         
-        logger.info('Message saved', { messageId: message._id, roomPin });
+        logger.info('Message saved', { 
+            messageId: message._id, 
+            roomPin,
+            username: data.username 
+        });
 
         // Emit to room
         io.to(roomPin).emit('receiveMessage', message);

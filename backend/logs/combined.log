@@ -5,3 +5,11 @@
 {"level":"info","message":"Quarantine service initialized","timestamp":"2025-11-15 14:00:07"}
 {"level":"info","message":"Scheduled tasks configured","timestamp":"2025-11-15 14:00:07"}
 {"level":"info","message":"All services initialized successfully","timestamp":"2025-11-15 14:00:07"}
+{"level":"info","message":"Server running on port 5000","timestamp":"2025-11-15 14:34:07"}
+{"level":"info","message":"Environment: production","timestamp":"2025-11-15 14:34:07"}
+{"level":"info","message":"Socket.IO server initialized","timestamp":"2025-11-15 14:34:07"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-15 14:34:09"}
+{"level":"info","message":"Encryption service initialized","timestamp":"2025-11-15 14:34:09"}
+{"level":"info","message":"Quarantine service initialized","timestamp":"2025-11-15 14:34:09"}
+{"level":"info","message":"Scheduled tasks configured","timestamp":"2025-11-15 14:34:09"}
+{"level":"info","message":"All services initialized successfully","timestamp":"2025-11-15 14:34:09"}

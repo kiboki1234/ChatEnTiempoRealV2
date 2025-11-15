@@ -5,6 +5,8 @@ const messageSchema = new mongoose.Schema({
     message: String,
     sticker: String,
     imageUrl: String,
+    voiceUrl: String,
+    voiceDuration: Number,
     roomPin: {
         type: String,
         default: 'general' // 'general' for the main chat

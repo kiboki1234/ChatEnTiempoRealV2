@@ -8,23 +8,44 @@ const getMessages = asyncHandler(async (req, res) => {
     res.status(200).json(messages);
 });
 
-const createMessage = asyncHandler(async (data) => {
-    logger.debug('Creating message', { username: data.username, roomPin: data.roomPin });
-    
-    const message = new Message({
-        username: data.username,
-        message: data.message,
-        imageUrl: data.imageUrl || null,
-        sticker: data.sticker || null,
-        roomPin: data.roomPin || 'general',
-        replyTo: data.replyTo || null
+const createMessage = async (data) => {
+    logger.debug('Creating message', { 
+        username: data.username, 
+        roomPin: data.roomPin,
+        hasVoice: !!data.voiceUrl,
+        hasImage: !!data.imageUrl
     });
     
-    await message.save();
-    logger.info('Message saved', { messageId: message._id, username: data.username });
-    
-    return await message.populate('replyTo');
-});
+    try {
+        const message = new Message({
+            username: data.username,
+            message: data.message,
+            imageUrl: data.imageUrl || null,
+            voiceUrl: data.voiceUrl || null,
+            voiceDuration: data.voiceDuration || null,
+            sticker: data.sticker || null,
+            roomPin: data.roomPin || 'general',
+            replyTo: data.replyTo || null
+        });
+        
+        await message.save();
+        logger.info('Message saved', { 
+            messageId: message._id, 
+            username: data.username,
+            roomPin: data.roomPin 
+        });
+        
+        // Populate replyTo if exists
+        if (data.replyTo) {
+            await message.populate('replyTo');
+        }
+        
+        return message;
+    } catch (error) {
+        logger.error('Error creating message', { error: error.message, data });
+        throw error;
+    }
+};
 
 module.exports = {
     getMessages,
