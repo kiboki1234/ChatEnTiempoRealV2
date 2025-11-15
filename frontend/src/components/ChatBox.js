@@ -151,7 +151,8 @@ const ChatBox = ({ initialRoomPin }) => {
 
         // Escuchar eventos de sala
         socket.on('roomJoined', async (room) => {
-            console.log('🔐 Sala unida con cifrado E2E:', room.pin);
+            console.log('🔐 Sala unida:', room.pin);
+            console.log('🔑 Clave recibida:', room.encryptionKey ? 'SÍ (length: ' + room.encryptionKey.length + ')' : 'NO');
             setCurrentRoom(room.pin);
             setRoomInfo(room);
             

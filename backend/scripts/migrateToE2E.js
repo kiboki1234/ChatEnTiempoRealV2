@@ -87,12 +87,18 @@ async function migrateToE2E() {
         // 3. Encontrar mensajes sin cifrar
         console.log('📊 Buscando mensajes sin cifrar...');
         const unencryptedMessages = await Message.find({
-            $or: [
-                { encryptedMessage: { $exists: false } },
-                { encryptedMessage: null },
-                { 'encryptedMessage.ciphertext': { $exists: false } }
-            ],
-            message: { $ne: null, $ne: '' } // Solo mensajes con texto
+            $and: [
+                { message: { $ne: null, $ne: '', $ne: '[Cifrado E2E]' } }, // Solo mensajes con texto real
+                {
+                    $or: [
+                        { encryptedMessage: { $exists: false } },
+                        { encryptedMessage: null },
+                        { 'encryptedMessage.ciphertext': { $exists: false } },
+                        { 'encryptedMessage.ciphertext': null },
+                        { 'encryptedMessage.ciphertext': '' }
+                    ]
+                }
+            ]
         });
 
         console.log(`✅ Encontrados ${unencryptedMessages.length} mensajes sin cifrar\n`);
