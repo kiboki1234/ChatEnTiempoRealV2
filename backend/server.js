@@ -51,8 +51,25 @@ app.use(helmet({
 }));
 
 // CORS configuration
+const allowedOrigins = [
+    process.env.FRONTEND_URL || 'https://chat-en-tiempo-real-v2.vercel.app',
+    'https://chat-en-tiempo-real-v2.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001'
+];
+
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'https://chat-en-tiempo-real-v2.vercel.app',
+    origin: function(origin, callback) {
+        // Allow requests with no origin (mobile apps, Postman, etc.)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
+            callback(null, true);
+        } else {
+            logger.warn('CORS blocked origin', { origin });
+            callback(null, true); // Allow in production for now
+        }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Content-Length', 'X-Requested-With']

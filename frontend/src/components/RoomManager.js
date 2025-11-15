@@ -18,20 +18,39 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
 
     useEffect(() => {
         // Cargar salas existentes
-        console.log('🔄 Cargando salas desde:', `${process.env.REACT_APP_SOCKET_SERVER_URL}/api/rooms`);
+        const serverUrl = process.env.REACT_APP_SOCKET_SERVER_URL || 'https://chatentiemporealv2.onrender.com';
+        const apiUrl = `${serverUrl}/api/rooms`;
         
-        fetch(`${process.env.REACT_APP_SOCKET_SERVER_URL}/api/rooms`)
+        console.log('🔄 Cargando salas desde:', apiUrl);
+        
+        fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            mode: 'cors'
+        })
             .then(response => {
-                console.log('📡 Response status:', response.status);
+                console.log('📡 Response status:', response.status, response.statusText);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 return response.json();
             })
             .then(data => {
                 console.log('✅ Salas cargadas:', data.length, 'salas', data);
-                setRooms(data);
+                // Filtrar solo las salas creadas por el usuario actual
+                const userRooms = Array.isArray(data) 
+                    ? data.filter(room => room.createdByUsername === username)
+                    : [];
+                console.log('🔍 Salas del usuario', username, ':', userRooms.length);
+                setRooms(userRooms);
             })
             .catch(err => {
                 console.error('❌ Error loading rooms:', err);
-                setError('Error al cargar las salas');
+                setError('Error al cargar las salas. Verifica la conexión.');
+                setRooms([]); // Set empty array to prevent crashes
             });
 
         // Escuchar eventos de sala
@@ -82,11 +101,14 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
         socket.on('roomListUpdated', ({ action, room, pin }) => {
             console.log('🔔 roomListUpdated event:', { action, room, pin });
             if (action === 'created') {
-                setRooms(prev => {
-                    const updated = [...prev.filter(r => r.pin !== room.pin), room];
-                    console.log('➕ Sala agregada, total:', updated.length);
-                    return updated;
-                });
+                // Solo agregar si es del usuario actual
+                if (room.createdByUsername === username) {
+                    setRooms(prev => {
+                        const updated = [...prev.filter(r => r.pin !== room.pin), room];
+                        console.log('➕ Sala agregada, total:', updated.length);
+                        return updated;
+                    });
+                }
             } else if (action === 'deleted') {
                 setRooms(prev => {
                     const updated = prev.filter(r => r.pin !== pin);

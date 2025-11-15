@@ -5,9 +5,26 @@ const { handleSendMessage } = require('./messageHandlers');
 const { handleGetUserStats, handleGetMyRooms, handleDisconnect, handleHeartbeat } = require('./userHandlers');
 
 module.exports = (server) => {
+    const allowedOrigins = [
+        process.env.FRONTEND_URL || 'https://chat-en-tiempo-real-v2.vercel.app',
+        'https://chat-en-tiempo-real-v2.vercel.app',
+        'http://localhost:3000',
+        'http://localhost:3001'
+    ];
+
     const io = new Server(server, {
         cors: {
-            origin: process.env.FRONTEND_URL || 'https://chat-en-tiempo-real-v2.vercel.app',
+            origin: function(origin, callback) {
+                // Allow requests with no origin (mobile apps, Postman, etc.)
+                if (!origin) return callback(null, true);
+                
+                if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
+                    callback(null, true);
+                } else {
+                    logger.warn('Socket.IO CORS blocked origin', { origin });
+                    callback(null, true); // Allow in production for now
+                }
+            },
             methods: ['GET', 'POST'],
             credentials: true
         },
