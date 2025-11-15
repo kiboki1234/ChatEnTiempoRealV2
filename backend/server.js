@@ -150,12 +150,14 @@ process.on('SIGTERM', async () => {
     });
 });
 
+// Inicializar Socket.IO
+const initializeSocket = require('./socket');
+const io = initializeSocket(server);
+
 // Iniciar servidor
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
     logger.info(`Server running on port ${PORT}`);
     logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
-
-// Cargar Socket.IO por separado
-require('./socket')(server); // Pasa el servidor HTTP al socket 
+    logger.info('Socket.IO server initialized');
+}); 

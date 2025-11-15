@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const sodium = require('libsodium-wrappers');
+const logger = require('../utils/logger');
 
 class EncryptionService {
     constructor() {
@@ -58,7 +59,7 @@ class EncryptionService {
                 authTag: authTag.toString('hex')
             };
         } catch (error) {
-            console.error('Error encrypting message:', error);
+            logger.error('Error encrypting message', { error: error.message });
             throw error;
         }
     }
@@ -88,7 +89,7 @@ class EncryptionService {
             
             return decrypted;
         } catch (error) {
-            console.error('Error decrypting message:', error);
+            logger.error('Error decrypting message', { error: error.message });
             throw error;
         }
     }
@@ -145,7 +146,7 @@ class EncryptionService {
                 authTag: authTag.toString('hex')
             };
         } catch (error) {
-            console.error('Error encrypting file:', error);
+            logger.error('Error encrypting file', { error: error.message });
             throw error;
         }
     }
@@ -174,7 +175,7 @@ class EncryptionService {
             
             return decrypted;
         } catch (error) {
-            console.error('Error decrypting file:', error);
+            logger.error('Error decrypting file', { error: error.message });
             throw error;
         }
     }

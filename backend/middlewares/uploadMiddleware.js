@@ -9,6 +9,7 @@ const quarantineService = require('../services/quarantineService');
 const { steganographyWorkerPool } = require('../services/workerPool');
 const AuditLog = require('../models/AuditLog');
 const router = express.Router();
+const logger = require('../utils/logger');
 require('dotenv').config();
 
 // Helper function to delete file with retries (for Windows file locks)
@@ -26,7 +27,7 @@ async function safeDeleteFile(filePath, maxRetries = 3, delayMs = 100) {
                 }
             }
             // If it's not a permission error or we've exhausted retries, log and continue
-            console.warn(`[WARN] Could not delete temp file ${filePath}:`, error.message);
+            logger.warn('Could not delete temp file', { filePath, error: error.message });
             return false;
         }
     }
@@ -182,7 +183,7 @@ router.post('/upload', (req, res, next) => {
         // Si no hay roomPin o es 'general', permitir (chat general siempre permite multimedia)
         
         // Analyze file for steganography using worker thread
-        console.log(`[SECURITY] Analyzing file: ${req.file.originalname} (${req.file.mimetype})`);
+        logger.info('Analyzing file for security', { filename: req.file.originalname, mimetype: req.file.mimetype });
         
         let analysisResult;
         try {
@@ -192,7 +193,7 @@ router.post('/upload', (req, res, next) => {
                 threshold: 7.95  // Higher threshold for better accuracy
             });
         } catch (workerError) {
-            console.error('[ERROR] Worker pool error:', workerError);
+            logger.error('Worker pool error during file analysis', { error: workerError.message });
             await safeDeleteFile(tempFilePath);
             return res.status(500).json({ 
                 error: 'Error analyzing file security',
@@ -201,7 +202,7 @@ router.post('/upload', (req, res, next) => {
         }
         
         if (!analysisResult || !analysisResult.success) {
-            console.error('[ERROR] Analysis failed:', analysisResult?.error || 'Unknown error');
+            logger.error('File analysis failed', { error: analysisResult?.error || 'Unknown error' });
             await safeDeleteFile(tempFilePath);
             return res.status(500).json({ 
                 error: 'Error analyzing file', 
@@ -340,7 +341,11 @@ router.post('/upload', (req, res, next) => {
         
         // If file is suspicious, quarantine it and reject upload
         if (analysis.suspicious) {
-            console.log(`[SECURITY] File rejected: ${req.file.originalname} - Risk Score: ${analysis.riskScore}`);
+            logger.warn('File rejected due to security concerns', { 
+                filename: req.file.originalname, 
+                riskScore: analysis.riskScore,
+                severity: analysis.severity
+            });
             
             // Quarantine the file
             await quarantineService.quarantineFile(tempFilePath, analysis, {
@@ -369,7 +374,7 @@ router.post('/upload', (req, res, next) => {
         }
         
         // File passed security checks, upload to Cloudinary
-        console.log(`[SECURITY] File approved: ${req.file.originalname}`);
+        logger.info('File approved for upload', { filename: req.file.originalname });
         
         // Determinar el resource_type correcto para Cloudinary
         let resourceType = 'auto';
@@ -379,19 +384,19 @@ router.post('/upload', (req, res, next) => {
         // Cloudinary maneja WebM como 'video' incluso para audio
         if (mimeType === 'audio/webm' || mimeType === 'video/webm' || fileExtension === '.webm') {
             resourceType = 'video';
-            console.log(`[CLOUDINARY] Usando resource_type 'video' para WebM`);
+            logger.debug('Using video resource_type for WebM');
         } else if (mimeType.startsWith('audio/')) {
             resourceType = 'video'; // Cloudinary usa 'video' para todos los medios de audio/video
-            console.log(`[CLOUDINARY] Usando resource_type 'video' para audio`);
+            logger.debug('Using video resource_type for audio');
         } else if (mimeType.startsWith('video/')) {
             resourceType = 'video';
-            console.log(`[CLOUDINARY] Usando resource_type 'video' para video`);
+            logger.debug('Using video resource_type for video');
         } else if (mimeType.startsWith('image/')) {
             resourceType = 'image';
-            console.log(`[CLOUDINARY] Usando resource_type 'image' para imagen`);
+            logger.debug('Using image resource_type');
         } else {
             resourceType = 'raw'; // Para documentos y otros archivos
-            console.log(`[CLOUDINARY] Usando resource_type 'raw' para documento`);
+            logger.debug('Using raw resource_type for document');
         }
         
         // Configuración de upload para Cloudinary con opciones adicionales
@@ -407,16 +412,15 @@ router.post('/upload', (req, res, next) => {
             uploadOptions.video_codec = 'none'; // Sin video, solo audio
         }
         
-        console.log(`[CLOUDINARY] Opciones de upload:`, JSON.stringify(uploadOptions));
+        logger.debug('Cloudinary upload options', { resourceType, format: uploadOptions.format });
         
         let uploadResult;
         try {
             uploadResult = await cloudinary.uploader.upload(tempFilePath, uploadOptions);
-            console.log(`[CLOUDINARY] ✅ Upload exitoso: ${uploadResult.secure_url}`);
+            logger.info('Cloudinary upload successful', { url: uploadResult.secure_url });
         } catch (cloudinaryError) {
             // Si falla con las opciones específicas, intentar con opciones básicas
-            console.warn(`[CLOUDINARY] ⚠️ Primer intento falló, intentando con opciones básicas...`);
-            console.warn(`[CLOUDINARY] Error:`, cloudinaryError.message);
+            logger.warn('Cloudinary upload failed, retrying with basic options', { error: cloudinaryError.message });
             
             try {
                 // Intento con opciones mínimas
@@ -424,9 +428,9 @@ router.post('/upload', (req, res, next) => {
                     folder: 'chat-images',
                     resource_type: 'raw' // Como último recurso, subir como archivo raw
                 });
-                console.log(`[CLOUDINARY] ✅ Upload exitoso como 'raw': ${uploadResult.secure_url}`);
+                logger.info('Cloudinary upload successful as raw', { url: uploadResult.secure_url });
             } catch (fallbackError) {
-                console.error(`[CLOUDINARY] ❌ Todos los intentos fallaron`);
+                logger.error('All Cloudinary upload attempts failed', { error: cloudinaryError.message });
                 throw cloudinaryError; // Lanzar el error original
             }
         }
@@ -448,7 +452,7 @@ router.post('/upload', (req, res, next) => {
         });
         
     } catch (error) {
-        console.error('[ERROR] Error uploading file:', error);
+        logger.error('Error uploading file', { error: error.message, filename: req.file?.originalname });
         
         // Clean up temporary file
         if (tempFilePath) {
@@ -507,13 +511,13 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
         res.json({ imageUrl: uploadResult.secure_url });
         
     } catch (error) {
-        console.error('Error uploading image:', error);
+        logger.error('Error uploading image', { error: error.message });
         
         if (tempFilePath) {
             try {
                 await safeDeleteFile(tempFilePath);
             } catch (unlinkError) {
-                console.error('Error deleting temp file:', unlinkError);
+                logger.error('Error deleting temp file', { error: unlinkError.message });
             }
         }
         

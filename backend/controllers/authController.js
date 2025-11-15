@@ -214,10 +214,7 @@ const verifyToken = async (req, res) => {
             await user.save();
         }
         
-        console.log('✅ Admin verify endpoint - user data:', {
-            username: user.username,
-            twoFactorEnabled: user.twoFactorEnabled
-        });
+        logger.info('Admin verified', { username: user.username, twoFactorEnabled: user.twoFactorEnabled });
         
         res.json({ 
             user: {
@@ -229,7 +226,7 @@ const verifyToken = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Error verifying token:', error);
+        logger.error('Error verifying token', { error: error.message });
         res.status(500).json({ error: 'Error verifying token' });
     }
 };

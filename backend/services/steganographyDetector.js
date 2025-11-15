@@ -3,6 +3,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
 const AuditLog = require('../models/AuditLog');
+const logger = require('../utils/logger');
 
 class SteganographyDetector {
     constructor() {
@@ -258,7 +259,7 @@ class SteganographyDetector {
                 }
             };
         } catch (error) {
-            console.error('Error analyzing image:', error);
+            logger.error('Error analyzing image', { error: error.message });
             throw error;
         }
     }
@@ -504,7 +505,7 @@ class SteganographyDetector {
                 reason: suspicious ? 'High entropy suggests possible hidden data' : 'File appears normal'
             };
         } catch (error) {
-            console.error('Error analyzing file:', error);
+            logger.error('Error analyzing file', { error: error.message });
             throw error;
         }
     }
@@ -584,7 +585,7 @@ class SteganographyDetector {
             
             return result;
         } catch (error) {
-            console.error('Error in steganography detection:', error);
+            logger.error('Error in steganography detection', { filePath, error: error.message });
             
             // Log error
             await AuditLog.create({

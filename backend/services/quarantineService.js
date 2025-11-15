@@ -1,6 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const AuditLog = require('../models/AuditLog');
+const logger = require('../utils/logger');
 
 class QuarantineService {
     constructor() {
@@ -12,7 +13,7 @@ class QuarantineService {
         try {
             await fs.mkdir(this.quarantineDir, { recursive: true });
         } catch (error) {
-            console.error('Error creating quarantine directory:', error);
+            logger.error('Error creating quarantine directory', { error: error.message });
         }
     }
 
@@ -62,7 +63,7 @@ class QuarantineService {
                 metadataPath
             };
         } catch (error) {
-            console.error('Error quarantining file:', error);
+            logger.error('Error quarantining file', { filePath, error: error.message });
             throw error;
         }
     }
@@ -86,7 +87,7 @@ class QuarantineService {
 
             return quarantinedFiles;
         } catch (error) {
-            console.error('Error getting quarantined files:', error);
+            logger.error('Error getting quarantined files', { error: error.message });
             return [];
         }
     }
@@ -112,7 +113,7 @@ class QuarantineService {
 
             return { success: true };
         } catch (error) {
-            console.error('Error deleting quarantined file:', error);
+            logger.error('Error deleting quarantined file', { fileName, error: error.message });
             throw error;
         }
     }
@@ -139,7 +140,7 @@ class QuarantineService {
                 metadata
             };
         } catch (error) {
-            console.error('Error restoring quarantined file:', error);
+            logger.error('Error restoring quarantined file', { fileName, error: error.message });
             throw error;
         }
     }
@@ -160,10 +161,10 @@ class QuarantineService {
                 }
             }
 
-            console.log(`Cleaned ${deletedCount} old quarantined files`);
+            logger.info('Cleaned old quarantined files', { deletedCount });
             return { deletedCount };
         } catch (error) {
-            console.error('Error cleaning old files:', error);
+            logger.error('Error cleaning old files', { error: error.message });
             throw error;
         }
     }

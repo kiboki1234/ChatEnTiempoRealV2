@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Room = require('../models/Room');
 const AuditLog = require('../models/AuditLog');
+const logger = require('../utils/logger');
 
 class UserService {
     /**
@@ -10,7 +11,7 @@ class UserService {
         try {
             return await User.findOrCreateByUsername(username, ipAddress, deviceFingerprint);
         } catch (error) {
-            console.error('Error in getOrCreateUser:', error);
+            logger.error('Error in getOrCreateUser', { username, error: error.message });
             throw error;
         }
     }
@@ -31,7 +32,7 @@ class UserService {
 
             return user.canCreateRoom();
         } catch (error) {
-            console.error('Error checking room creation permission:', error);
+            logger.error('Error checking room creation permission', { username, error: error.message });
             throw error;
         }
     }
@@ -53,7 +54,7 @@ class UserService {
 
             return user;
         } catch (error) {
-            console.error('Error registering room creation:', error);
+            logger.error('Error registering room creation', { username, roomId, error: error.message });
             throw error;
         }
     }
@@ -74,7 +75,7 @@ class UserService {
 
             return user;
         } catch (error) {
-            console.error('Error removing user room:', error);
+            logger.error('Error removing user room', { username, roomId, error: error.message });
             throw error;
         }
     }
@@ -115,7 +116,7 @@ class UserService {
                 user
             };
         } catch (error) {
-            console.error('Error promoting user to admin:', error);
+            logger.error('Error promoting user to admin', { username, error: error.message });
             throw error;
         }
     }
@@ -156,7 +157,7 @@ class UserService {
                 user
             };
         } catch (error) {
-            console.error('Error demoting admin to user:', error);
+            logger.error('Error demoting admin to user', { username, error: error.message });
             throw error;
         }
     }
@@ -205,7 +206,7 @@ class UserService {
                 lastActivity: user.lastActivity
             };
         } catch (error) {
-            console.error('Error getting user stats:', error);
+            logger.error('Error getting user stats', { username, error: error.message });
             throw error;
         }
     }
@@ -233,7 +234,7 @@ class UserService {
                 cleanedRooms: inactiveRooms.length
             };
         } catch (error) {
-            console.error('Error cleaning up inactive rooms:', error);
+            logger.error('Error cleaning up inactive rooms', { error: error.message });
             throw error;
         }
     }
@@ -263,7 +264,7 @@ class UserService {
                 }
             };
         } catch (error) {
-            console.error('Error getting all users:', error);
+            logger.error('Error getting all users', { error: error.message });
             throw error;
         }
     }
