@@ -104,6 +104,105 @@ node scripts/promoteUser.js john_doe
 
 ## 🔧 Mantenimiento General
 
+### `syncRoomCounts.js` ⭐ NUEVO
+**Propósito:** Sincronizar contadores de salas activas con la realidad de la base de datos.
+
+**Uso:**
+```bash
+node scripts/syncRoomCounts.js
+```
+
+**Qué hace:**
+- ✅ Encuentra todas las salas activas en la BD
+- ✅ Cuenta cuántas salas tiene cada usuario
+- ✅ Actualiza `stats.activeRoomsCount` de cada usuario
+- ✅ Actualiza array `stats.activeRooms` con roomIds correctos
+- ✅ Limpia usuarios sin salas activas
+- ✅ Muestra usuarios que exceden el límite (3 salas)
+
+**Cuándo ejecutar:**
+- Después de corregir bugs en el sistema de límites de salas
+- Si usuarios reportan que no pueden crear salas cuando deberían poder
+- Si usuarios pueden crear más salas de las permitidas
+- Como parte del mantenimiento semanal
+- Después de migraciones o cambios en el modelo de Room/User
+
+**Ejemplo de salida:**
+```
+🚀 Iniciando sincronización de contadores de salas...
+
+✅ Encontradas 9 salas activas
+
+👥 Usuarios con salas activas: 4
+
+✅ andres: 2 → 6 salas
+   📌 938974 (espe)
+   📌 593301 (espe1)
+   📌 585441 (sal)
+   📌 794279 (Test1)
+   📌 520931 (Test3)
+   📌 886315 (Test5)
+
+==================================================
+📊 RESUMEN DE SINCRONIZACIÓN
+==================================================
+✅ Usuarios actualizados: 1
+🧹 Usuarios limpiados: 0
+❌ Errores: 0
+📦 Total salas activas: 9
+==================================================
+
+⚠️  USUARIOS QUE EXCEDEN EL LÍMITE (3 salas):
+❗ andres: 6 salas
+```
+
+### `verifyRoomIntegrity.js` ⭐ NUEVO
+**Propósito:** Verificar integridad de las salas activas en la base de datos.
+
+**Uso:**
+```bash
+node scripts/verifyRoomIntegrity.js
+```
+
+**Qué hace:**
+- ✅ Detecta salas con nombres duplicados
+- ✅ Detecta PINs duplicados (ERROR CRÍTICO)
+- ✅ Detecta salas sin creador
+- ✅ Verifica que los creadores existan en la BD de usuarios
+- ✅ Genera reporte completo de integridad
+
+**Cuándo ejecutar:**
+- Si hay reportes de problemas con PINs
+- Si usuarios no pueden unirse a salas existentes
+- Como parte del mantenimiento semanal
+- Después de migraciones o actualizaciones importantes
+- Si hay comportamiento extraño en el sistema de salas
+
+**Ejemplo de salida:**
+```
+🚀 Verificando integridad de salas...
+
+✅ Encontradas 9 salas activas
+
+✅ No hay nombres duplicados
+✅ No hay PINs duplicados
+✅ Todas las salas tienen creador
+
+⚠️  Usuario "andres123" no existe pero tiene 1 salas:
+   📌 363983 (a)
+
+==================================================
+📊 RESUMEN DE INTEGRIDAD
+==================================================
+📦 Total salas activas: 9
+👥 Creadores únicos: 4
+⚠️  Nombres duplicados: 0
+❌ PINs duplicados: 0
+⚠️  Salas sin creador: 0
+⚠️  Creadores inexistentes: 3
+==================================================
+```
+
 ### Limpieza de sesiones expiradas
 Ejecutar desde el directorio raíz del backend:
 
