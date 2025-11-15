@@ -265,12 +265,13 @@ const ChatBox = ({ initialRoomPin }) => {
     }, [currentRoom, username]);
 
     useEffect(() => {
-        if (initialRoomPin) {
+        // Solo intentar unirse si hay PIN y el usuario está autenticado
+        if (initialRoomPin && username) {
             setAutoJoining(true);
             console.log('Uniéndose automáticamente a la sala con PIN:', initialRoomPin);
             socket.emit('joinRoom', {
                 pin: initialRoomPin,
-                username: username || generateUsername()
+                username: username
             });
             setCurrentRoom(initialRoomPin);
         }
