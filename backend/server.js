@@ -5,10 +5,15 @@ const mongoose = require('mongoose');
 const helmet = require('helmet');
 require('dotenv').config();
 
+// Utils
+const logger = require('./utils/logger');
+const { errorHandler } = require('./utils/errorHandler');
+
 // Services
 const encryptionService = require('./services/encryptionService');
 const roomController = require('./controllers/roomController');
 const UserService = require('./services/userService');
+const quarantineService = require('./services/quarantineService');
 
 // Middlewares
 const { generalLimiter } = require('./middlewares/rateLimitMiddleware');
@@ -81,20 +86,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/security', securityRoutes); // Security management
 app.use('/api', uploadMiddleware);
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Error:', err);
-    
-    // Don't leak error details in production
-    const errorMessage = process.env.NODE_ENV === 'production' 
-        ? 'Internal server error' 
-        : err.message;
-    
-    res.status(err.status || 500).json({
-        error: errorMessage,
-        ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
-    });
-});
+// Error handling middleware - debe ir AL FINAL
+app.use(errorHandler);
 
 // 404 handler
 app.use((req, res) => {
@@ -102,68 +95,56 @@ app.use((req, res) => {
 });
 
 // Initialize services
-const quarantineService = require('./services/quarantineService');
-
 const initializeServices = async () => {
-    try {
-        // Initialize encryption service
-        await encryptionService.initialize();
-        console.log('✓ Encryption service initialized');
-        
-        // Initialize quarantine service
-        await quarantineService.init();
-        console.log('✓ Quarantine service initialized');
-        
-        // Schedule cleanup of expired rooms and inactive users (every hour)
-        setInterval(async () => {
-            try {
-                await roomController.cleanupExpiredRooms();
-                await UserService.cleanupInactiveRooms();
-                console.log('✓ Cleanup completed');
-            } catch (error) {
-                console.error('Error in scheduled cleanup:', error);
-            }
-        }, 60 * 60 * 1000); // 1 hour
-        
-        // Schedule cleanup of old quarantined files (daily)
-        setInterval(async () => {
-            try {
-                await quarantineService.cleanOldFiles(30);
-                console.log('✓ Quarantine cleanup completed');
-            } catch (error) {
-                console.error('Error in quarantine cleanup:', error);
-            }
-        }, 24 * 60 * 60 * 1000); // 24 hours
-        
-        console.log('✓ Scheduled tasks configured');
-    } catch (error) {
-        console.error('Error initializing services:', error);
-        throw error;
-    }
+    await encryptionService.initialize();
+    logger.info('Encryption service initialized');
+    
+    await quarantineService.init();
+    logger.info('Quarantine service initialized');
+    
+    // Schedule cleanup tasks
+    setInterval(async () => {
+        try {
+            await roomController.cleanupExpiredRooms();
+            await UserService.cleanupInactiveRooms();
+            logger.info('Cleanup completed');
+        } catch (error) {
+            logger.error('Error in scheduled cleanup', { error: error.message });
+        }
+    }, 60 * 60 * 1000); // 1 hour
+    
+    setInterval(async () => {
+        try {
+            await quarantineService.cleanOldFiles(30);
+            logger.info('Quarantine cleanup completed');
+        } catch (error) {
+            logger.error('Error in quarantine cleanup', { error: error.message });
+        }
+    }, 24 * 60 * 60 * 1000); // 24 hours
+    
+    logger.info('Scheduled tasks configured');
 };
 
 // Conectar a MongoDB
 mongoose.connect(process.env.MONGO_URI)
-.then(() => {
-    console.log('✓ Connected to MongoDB');
-    return initializeServices();
-})
-.then(() => {
-    console.log('✓ All services initialized successfully');
+.then(async () => {
+    logger.info('Connected to MongoDB');
+    await initializeServices();
+    logger.info('All services initialized successfully');
 })
 .catch((error) => {
-    console.error('✗ Error connecting to MongoDB or initializing services:', error);
+    logger.error('Error connecting to MongoDB or initializing services', { error: error.message });
     process.exit(1);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-    console.log('SIGTERM received, shutting down gracefully...');
+    logger.info('SIGTERM received, shutting down gracefully');
     
     server.close(() => {
-        console.log('HTTP server closed');
+        logger.info('HTTP server closed');
         mongoose.connection.close(false, () => {
-            console.log('MongoDB connection closed');
+            logger.info('MongoDB connection closed');
             process.exit(0);
         });
     });
@@ -172,8 +153,8 @@ process.on('SIGTERM', async () => {
 // Iniciar servidor
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-    console.log(`✓ Server running on port ${PORT}`);
-    console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`Server running on port ${PORT}`);
+    logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
 // Cargar Socket.IO por separado
