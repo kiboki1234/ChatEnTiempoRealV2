@@ -757,6 +757,45 @@ body.dark-mode .success-message {
     color: #667eea;
     font-weight: 600;
     font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.room-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    animation: fadeInScale 0.3s ease;
+}
+
+.room-type-badge.text-only {
+    background: linear-gradient(135deg, #ffd54f 0%, #ffb300 100%);
+    color: #663d00;
+    box-shadow: 0 2px 8px rgba(255, 179, 0, 0.3);
+}
+
+.room-type-badge.full-features {
+    background: linear-gradient(135deg, #81c784 0%, #66bb6a 100%);
+    color: #1b5e20;
+    box-shadow: 0 2px 8px rgba(102, 187, 106, 0.3);
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 body.dark-mode .current-room-info {
@@ -1126,6 +1165,29 @@ body.dark-mode .cancel-image-button {
 
 .mobile-action-button svg {
     font-size: 18px;
+}
+
+/* Botones deshabilitados en salas de solo texto */
+.attach-button.disabled,
+.voice-button.disabled,
+.mobile-action-button.disabled {
+    opacity: 0.4;
+    cursor: not-allowed !important;
+    background: #e0e0e0 !important;
+    color: #999 !important;
+    pointer-events: none;
+}
+
+body.dark-mode .attach-button.disabled,
+body.dark-mode .voice-button.disabled,
+body.dark-mode .mobile-action-button.disabled {
+    background: #333 !important;
+    color: #666 !important;
+}
+
+.mobile-action-button.disabled:hover {
+    transform: none !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08) !important;
 }
 
 /* Estilos para tema oscuro del menú móvil */

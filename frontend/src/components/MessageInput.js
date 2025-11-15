@@ -6,13 +6,35 @@ import socket from '../services/socketService';
 import VoiceRecorder from './VoiceRecorder';
 import '../App.css';
 
-const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
+const MessageInput = ({ username, replyTo, setReplyTo, roomPin, roomInfo }) => {
     const [input, setInput] = useState('');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [showAttachMenu, setShowAttachMenu] = useState(false);
     const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [image, setImage] = useState(null);
+    
+    // Verificar si la sala es solo texto
+    const isTextOnlyRoom = roomInfo?.type === 'text';
+    
+    // Handler para mostrar mensaje cuando se intenta usar funciones deshabilitadas
+    const handleDisabledFeatureClick = () => {
+        if (isTextOnlyRoom) {
+            alert(
+                '📝 SALA DE SOLO TEXTO\n\n' +
+                'Esta sala está configurada para mensajes de texto únicamente.\n\n' +
+                '🚫 Funciones deshabilitadas:\n' +
+                '• Envío de archivos e imágenes\n' +
+                '• Mensajes de voz\n' +
+                '• Documentos y multimedia\n\n' +
+                '✅ Funciones disponibles:\n' +
+                '• Mensajes de texto\n' +
+                '• Emojis\n' +
+                '• Responder mensajes\n\n' +
+                'Para usar todas las funcionalidades, únete a una sala multimedia.'
+            );
+        }
+    };
     const [imagePreview, setImagePreview] = useState(null);
     const [fileType, setFileType] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -484,17 +506,19 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
                     </button>
                     
                     <button
-                        className="attach-button"
-                        onClick={() => setShowAttachMenu(!showAttachMenu)}
-                        title="Adjuntar archivo"
+                        className={`attach-button ${isTextOnlyRoom ? 'disabled' : ''}`}
+                        onClick={() => isTextOnlyRoom ? handleDisabledFeatureClick() : setShowAttachMenu(!showAttachMenu)}
+                        title={isTextOnlyRoom ? "📝 Sala de solo texto - Archivos deshabilitados" : "Adjuntar archivo"}
+                        disabled={isTextOnlyRoom}
                     >
                         <FaPaperclip />
                     </button>
                     
                     <button
-                        className="voice-button"
-                        onClick={() => setShowVoiceRecorder(true)}
-                        title="Grabar mensaje de voz"
+                        className={`voice-button ${isTextOnlyRoom ? 'disabled' : ''}`}
+                        onClick={() => isTextOnlyRoom ? handleDisabledFeatureClick() : setShowVoiceRecorder(true)}
+                        title={isTextOnlyRoom ? "📝 Sala de solo texto - Audio deshabilitado" : "Grabar mensaje de voz"}
+                        disabled={isTextOnlyRoom}
                     >
                         <FaMicrophone />
                     </button>
@@ -518,28 +542,40 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
                         <FaSmile /> <span>Emojis</span>
                     </button>
                     <button
-                        className="mobile-action-button attach"
+                        className={`mobile-action-button attach ${isTextOnlyRoom ? 'disabled' : ''}`}
                         onClick={() => {
-                            setShowAttachMenu(!showAttachMenu);
-                            setShowMobileMenu(false);
+                            if (isTextOnlyRoom) {
+                                handleDisabledFeatureClick();
+                            } else {
+                                setShowAttachMenu(!showAttachMenu);
+                                setShowMobileMenu(false);
+                            }
                         }}
+                        disabled={isTextOnlyRoom}
+                        title={isTextOnlyRoom ? "Sala de solo texto" : "Archivos"}
                     >
-                        <FaPaperclip /> <span>Archivos</span>
+                        <FaPaperclip /> <span>Archivos {isTextOnlyRoom && '🔒'}</span>
                     </button>
                     <button
-                        className="mobile-action-button voice"
+                        className={`mobile-action-button voice ${isTextOnlyRoom ? 'disabled' : ''}`}
                         onClick={() => {
-                            setShowVoiceRecorder(true);
-                            setShowMobileMenu(false);
+                            if (isTextOnlyRoom) {
+                                handleDisabledFeatureClick();
+                            } else {
+                                setShowVoiceRecorder(true);
+                                setShowMobileMenu(false);
+                            }
                         }}
+                        disabled={isTextOnlyRoom}
+                        title={isTextOnlyRoom ? "Sala de solo texto" : "Audio"}
                     >
-                        <FaMicrophone /> <span>Audio</span>
+                        <FaMicrophone /> <span>Audio {isTextOnlyRoom && '🔒'}</span>
                     </button>
                 </div>
             )}
             
-            {/* Menú de adjuntos tipo WhatsApp */}
-            {showAttachMenu && (
+            {/* Menú de adjuntos tipo WhatsApp - deshabilitado en salas de solo texto */}
+            {showAttachMenu && !isTextOnlyRoom && (
                 <div className="attach-menu" ref={attachMenuRef}>
                     <div className="attach-option" onClick={() => handleAttachClick('image')}>
                         <div className="attach-icon image-icon">
@@ -574,14 +610,14 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
                 </div>
             )}
             
-            {/* Inputs ocultos para diferentes tipos de archivos */}
+            {/* Inputs ocultos para diferentes tipos de archivos - deshabilitados en salas de solo texto */}
             <input
                 id="file-upload-image"
                 type="file"
                 accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/bmp,image/svg+xml,.jpg,.jpeg,.png,.gif,.webp,.bmp,.svg"
                 onChange={handleImageChange}
                 style={{ display: 'none' }}
-                disabled={isUploading}
+                disabled={isUploading || isTextOnlyRoom}
             />
             <input
                 id="file-upload-document"
@@ -589,7 +625,7 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
                 accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
                 onChange={handleImageChange}
                 style={{ display: 'none' }}
-                disabled={isUploading}
+                disabled={isUploading || isTextOnlyRoom}
             />
             <input
                 id="file-upload-video"
@@ -597,7 +633,7 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
                 accept="video/mp4,video/avi,video/quicktime,video/x-msvideo,video/x-matroska,.mp4,.avi,.mov,.mkv"
                 onChange={handleImageChange}
                 style={{ display: 'none' }}
-                disabled={isUploading}
+                disabled={isUploading || isTextOnlyRoom}
             />
             <input
                 id="file-upload-audio"
@@ -605,7 +641,7 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
                 accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/x-m4a,.mp3,.wav,.ogg,.m4a"
                 onChange={handleImageChange}
                 style={{ display: 'none' }}
-                disabled={isUploading}
+                disabled={isUploading || isTextOnlyRoom}
             />
             <input
                 id="file-upload-file"
@@ -613,7 +649,7 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
                 accept="application/zip,application/x-zip-compressed,application/x-rar-compressed,application/x-7z-compressed,.zip,.rar,.7z"
                 onChange={handleImageChange}
                 style={{ display: 'none' }}
-                disabled={isUploading}
+                disabled={isUploading || isTextOnlyRoom}
             />
             
             {showEmojiPicker && (
@@ -622,8 +658,8 @@ const MessageInput = ({ username, replyTo, setReplyTo, roomPin }) => {
                 </div>
             )}
             
-            {/* Grabadora de voz */}
-            {showVoiceRecorder && (
+            {/* Grabadora de voz - deshabilitada en salas de solo texto */}
+            {showVoiceRecorder && !isTextOnlyRoom && (
                 <VoiceRecorder
                     onCancel={() => setShowVoiceRecorder(false)}
                     onSendVoice={handleVoiceSend}

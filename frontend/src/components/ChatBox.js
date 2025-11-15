@@ -397,7 +397,20 @@ const ChatBox = ({ initialRoomPin }) => {
                     <UserStats username={username} />
                     
                     <div className="current-room-info">
-                        <h3>Sala Actual: {roomInfo.name} {currentRoom !== 'general' && `(PIN: ${currentRoom})`}</h3>
+                        <h3>
+                            Sala Actual: {roomInfo.name} 
+                            {currentRoom !== 'general' && ` (PIN: ${currentRoom})`}
+                            {roomInfo.type === 'text' && (
+                                <span className="room-type-badge text-only" title="Solo se permiten mensajes de texto">
+                                    📝 Solo Texto
+                                </span>
+                            )}
+                            {roomInfo.type !== 'text' && roomInfo.type && (
+                                <span className="room-type-badge full-features" title="Todas las funcionalidades disponibles">
+                                    ✨ Multimedia
+                                </span>
+                            )}
+                        </h3>
                         
                         {currentRoom !== 'general' && (
                             <button 
@@ -427,6 +440,7 @@ const ChatBox = ({ initialRoomPin }) => {
                         replyTo={replyTo} 
                         setReplyTo={setReplyTo} 
                         roomPin={currentRoom}
+                        roomInfo={roomInfo}
                     />
                 </div>
 
