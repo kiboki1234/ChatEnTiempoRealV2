@@ -186,6 +186,13 @@ const handleCreateRoom = (io) => async (socket, { name, maxParticipants, type, u
 // Close room handler
 const handleCloseRoom = (io) => async (socket, { pin, username }) => {
     try {
+        // Get room before deleting to obtain roomId
+        const room = await roomController.getRoomByPin(pin);
+        if (!room) {
+            socket.emit('roomError', { message: 'Sala no encontrada' });
+            return;
+        }
+
         const result = await roomController.deleteRoom(pin, socket.id);
 
         if (!result.success) {
@@ -193,8 +200,8 @@ const handleCloseRoom = (io) => async (socket, { pin, username }) => {
             return;
         }
 
-        // Remove room from user's active rooms
-        await UserService.removeUserRoom(username, pin);
+        // Remove room from user's active rooms - CRITICAL: pass room._id not pin
+        await UserService.removeUserRoom(username, room._id);
 
         // Notify all users in the room
         io.to(pin).emit('roomClosed', {
