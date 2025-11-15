@@ -64,22 +64,30 @@ const handleJoinRoom = (io) => async (socket, { pin, username }) => {
 
         const roomObject = roomToObject(result.room);
         
-        // Send room with encryption key to joiner (for E2E encryption)
-        socket.emit('roomJoined', {
-            ...roomObject,
-            encryptionKey: room.encryptionKey // Share encryption key with new joiner
-        });
+        // Send room with encryption key to joiner (ONLY for new rooms with E2E)
+        const roomJoinedData = {
+            ...roomObject
+        };
+        
+        // Include encryptionKey only if room has it (new rooms)
+        if (room.encryptionKey) {
+            roomJoinedData.encryptionKey = room.encryptionKey;
+            logger.info('Room with E2E encryption', { pin, hasKey: true });
+        } else {
+            logger.info('Legacy room without E2E', { pin, hasKey: false });
+        }
+        
+        socket.emit('roomJoined', roomJoinedData);
         
         // Notify ALL users in the room (including the one who joined) about the updated participant list
-        // Include encryption key so all participants can decrypt messages
-        io.to(pin).emit('userJoined', { 
+        // Include encryption key only for new rooms with E2E
+        const userJoinedData = { 
             username, 
-            room: {
-                ...roomObject,
-                encryptionKey: room.encryptionKey // Share encryption key with all participants
-            },
+            room: roomJoinedData, // Uses same data structure (with or without key)
             participants: result.room.participants 
-        });
+        };
+        
+        io.to(pin).emit('userJoined', userJoinedData);
 
         emitRoomUpdate(io, result.room);
         emitUserActivity(io, 'joined', username, pin);
