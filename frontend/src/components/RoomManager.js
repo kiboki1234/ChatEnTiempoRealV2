@@ -39,6 +39,12 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
             setTimeout(() => setError(''), 5000);
         });
 
+        socket.on('roomCreationError', (data) => {
+            setError(data.message);
+            setShowCreateForm(false);
+            setTimeout(() => setError(''), 5000);
+        });
+
         socket.on('userJoined', ({ participants }) => {
             // Actualizar la lista de participantes en la sala actual
             setRooms(prev => 
@@ -61,11 +67,34 @@ const RoomManager = ({ username, onJoinRoom, currentRoom }) => {
             );
         });
 
+        // Escuchar actualización de lista de salas
+        socket.on('roomListUpdated', ({ action, room, pin }) => {
+            if (action === 'created') {
+                setRooms(prev => [...prev.filter(r => r.pin !== room.pin), room]);
+            } else if (action === 'deleted') {
+                setRooms(prev => prev.filter(r => r.pin !== pin));
+            }
+        });
+
+        // Escuchar actualizaciones de salas
+        socket.on('roomUpdated', ({ pin, participantCount, maxParticipants }) => {
+            setRooms(prev => 
+                prev.map(room => 
+                    room.pin === pin 
+                        ? { ...room, participantCount, maxParticipants } 
+                        : room
+                )
+            );
+        });
+
         return () => {
             socket.off('roomCreated');
             socket.off('roomError');
+            socket.off('roomCreationError');
             socket.off('userJoined');
             socket.off('userLeft');
+            socket.off('roomListUpdated');
+            socket.off('roomUpdated');
         };
     }, [currentRoom, onJoinRoom]);
 

@@ -160,8 +160,9 @@ const ChatBox = ({ initialRoomPin }) => {
             }
         });
 
-        socket.on('roomError', (error) => {
-            console.error('Room error:', error.message);
+        // Función común para manejar errores de sesión
+        const handleSessionError = (error) => {
+            console.error('Session/Room error:', error.message);
             setError(error.message);
             setAutoJoining(false);
             
@@ -197,6 +198,19 @@ const ChatBox = ({ initialRoomPin }) => {
                     window.location.reload();
                 }, 1000);
             }
+        };
+
+        socket.on('sessionError', handleSessionError);
+        socket.on('roomError', handleSessionError);
+
+        socket.on('replacedByRegisteredUser', (data) => {
+            console.log('⚠️ Sesión de invitado reemplazada por usuario registrado');
+            alert(`Tu sesión de invitado ha sido reemplazada por un usuario registrado desde el mismo dispositivo.`);
+            
+            // Desconectar y limpiar
+            socket.disconnect();
+            localStorage.clear();
+            window.location.reload();
         });
 
         return () => {
@@ -205,7 +219,9 @@ const ChatBox = ({ initialRoomPin }) => {
             socket.off('receiveMessage');
             socket.off('userJoined');
             socket.off('userLeft');
+            socket.off('sessionError');
             socket.off('roomError');
+            socket.off('replacedByRegisteredUser');
         };
     }, [currentRoom, username]);
 

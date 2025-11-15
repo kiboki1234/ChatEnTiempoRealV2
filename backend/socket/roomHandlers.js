@@ -63,7 +63,11 @@ const handleJoinRoom = (io) => async (socket, { pin, username }) => {
 
         const roomObject = roomToObject(result.room);
         socket.emit('roomJoined', roomObject);
-        socket.to(pin).emit('userJoined', { username, room: roomObject });
+        socket.to(pin).emit('userJoined', { 
+            username, 
+            room: roomObject,
+            participants: result.room.participants 
+        });
 
         emitRoomUpdate(io, result.room);
         emitUserActivity(io, 'joined', username, pin);
@@ -87,7 +91,14 @@ const handleLeaveRoom = (io) => async (socket) => {
             const room = await roomController.getRoomByPin(roomPin);
             if (room) {
                 emitRoomUpdate(io, room);
+                // Notify remaining users that someone left
+                io.to(roomPin).emit('userLeft', { 
+                    participants: room.participants 
+                });
             }
+            
+            // Notify the user who left
+            socket.emit('roomLeft');
         }
     } catch (error) {
         logger.error('Error leaving room', { error: error.message });
@@ -153,8 +164,6 @@ const handleCreateRoom = (io) => async (socket, { name, maxParticipants, type, u
 // Close room handler
 const handleCloseRoom = (io) => async (socket, { pin, username }) => {
     try {
-        const ipAddress = getRealIP(socket);
-
         const result = await roomController.deleteRoom(pin, socket.id);
 
         if (!result.success) {

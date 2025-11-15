@@ -4,10 +4,20 @@ const logger = require('../utils/logger');
 
 // Helper function to safely convert room to plain object
 const roomToObject = (room) => {
+    let roomObj;
     if (typeof room.toObject === 'function') {
-        return room.toObject();
+        roomObj = room.toObject();
+    } else {
+        roomObj = room;
     }
-    return room;
+    
+    // Ensure participantCount is included
+    if (roomObj && roomObj.participants) {
+        roomObj.participantCount = roomObj.participants.length;
+        roomObj.isFull = roomObj.participants.length >= (roomObj.maxParticipants || 10);
+    }
+    
+    return roomObj;
 };
 
 // Get real IP address from socket, considering proxy headers
