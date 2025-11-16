@@ -155,7 +155,7 @@ const ChatBox = ({ initialRoomPin }) => {
             setCurrentRoom(room.pin);
             setRoomInfo(room);
             
-            // Initialize crypto service and set room encryption key
+            // Initialize crypto service and set room encryption key FIRST
             if (room.encryptionKey) {
                 await cryptoService.initialize();
                 cryptoService.setRoomKey(room.pin, room.encryptionKey);
@@ -168,36 +168,36 @@ const ChatBox = ({ initialRoomPin }) => {
                 setParticipants(room.participants);
             }
             
-            // Cargar mensajes de la sala
-            fetch(`${process.env.REACT_APP_SOCKET_SERVER_URL}/api/chat?roomPin=${room.pin}`)
-                .then(response => response.json())
-                .then(async (data) => {
-                    // Decrypt historical messages (only if they have encrypted data)
-                    const decryptedMessages = await Promise.all(
-                        data.map(async (msg) => {
-                            if (msg.encryptedMessage && msg.encryptedMessage.ciphertext && msg.encryptedMessage.nonce) {
-                                try {
-                                    const decrypted = await cryptoService.decryptMessage(
-                                        msg.encryptedMessage,
-                                        room.pin
-                                    );
-                                    msg.message = decrypted;
-                                    console.log('🔓 Mensaje histórico descifrado');
-                                } catch (error) {
-                                    console.error('❌ Error descifrando mensaje histórico:', error);
-                                    msg.message = '[Error: No se pudo descifrar]';
-                                }
+            // WAIT for encryption key to be set before loading messages
+            try {
+                const response = await fetch(`${process.env.REACT_APP_SOCKET_SERVER_URL}/api/chat?roomPin=${room.pin}`);
+                const data = await response.json();
+                
+                // Decrypt historical messages (only if they have encrypted data)
+                const decryptedMessages = await Promise.all(
+                    data.map(async (msg) => {
+                        if (msg.encryptedMessage && msg.encryptedMessage.ciphertext && msg.encryptedMessage.nonce) {
+                            try {
+                                const decrypted = await cryptoService.decryptMessage(
+                                    msg.encryptedMessage,
+                                    room.pin
+                                );
+                                msg.message = decrypted;
+                                console.log('🔓 Mensaje histórico descifrado correctamente');
+                            } catch (error) {
+                                console.error('❌ Error descifrando mensaje histórico:', error.message);
+                                msg.message = '[Error: No se pudo descifrar - clave incorrecta]';
                             }
-                            // Si no tiene encryptedMessage, usar el mensaje en texto plano (legacy)
-                            return msg;
-                        })
-                    );
-                    setMessages(decryptedMessages);
-                    console.log('📜 Mensajes cargados:', decryptedMessages.length);
-                })
-                .catch(error => {
-                    console.error('Error cargando mensajes:', error);
-                });
+                        }
+                        // Si no tiene encryptedMessage, usar el mensaje en texto plano (legacy)
+                        return msg;
+                    })
+                );
+                setMessages(decryptedMessages);
+                console.log('📜 Mensajes cargados:', decryptedMessages.length);
+            } catch (error) {
+                console.error('Error cargando mensajes:', error);
+            }
         });
 
         socket.on('userJoined', ({ username: joinedUser, room, participants }) => {
