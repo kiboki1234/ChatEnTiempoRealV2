@@ -144,8 +144,15 @@ const ChatBox = ({ initialRoomPin }) => {
     useEffect(() => {
         if (!username) return; // Skip if username is not set yet
         
-        // Unirse a la sala general por defecto
+        // NO unirse automáticamente a general si hay un initialRoomPin pendiente
+        if (initialRoomPin) {
+            console.log('⏳ Esperando a unirse a sala específica con PIN:', initialRoomPin);
+            return; // El otro useEffect manejará el join
+        }
+        
+        // Unirse a la sala general por defecto solo si no hay PIN inicial
         if (currentRoom === 'general') {
+            console.log('✅ Uniéndose a sala general por defecto');
             socket.emit('joinRoom', { pin: 'general', username });
         }
 
@@ -313,7 +320,7 @@ const ChatBox = ({ initialRoomPin }) => {
             socket.off('roomError');
             socket.off('replacedByRegisteredUser');
         };
-    }, [currentRoom, username]);
+    }, [currentRoom, username, initialRoomPin]);
 
     useEffect(() => {
         // Solo intentar unirse si hay PIN y el usuario está autenticado
