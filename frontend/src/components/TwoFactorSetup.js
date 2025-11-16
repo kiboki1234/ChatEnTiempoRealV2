@@ -83,7 +83,11 @@ const TwoFactorSetup = ({ token, onClose, onUpdate, userRole }) => {
 
         try {
             console.log('🔐 Enabling 2FA with code:', verificationCode);
+            console.log('🔑 Token:', token ? 'Present' : 'MISSING');
+            console.log('🔑 Token value:', token);
+            console.log('👤 User role:', userRole);
             const baseRoute = getBaseRoute();
+            console.log('📍 API URL:', `${API_URL}${baseRoute}/2fa/enable`);
             await axios.post(
                 `${API_URL}${baseRoute}/2fa/enable`,
                 { twoFactorCode: verificationCode },

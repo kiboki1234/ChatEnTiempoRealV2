@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FaReply } from 'react-icons/fa';
 import Linkify from 'react-linkify'; // Convierte texto en enlaces clickeables
-import axios from 'axios'; // Para solicitudes HTTP
 import VoiceMessagePlayer from './VoiceMessagePlayer'; // Reproductor de audio personalizado
 import '../styles/sendMessages.css';
 
@@ -46,7 +45,7 @@ const MessageList = ({ messages = [], onReply, username }) => {
         messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    // Obtener previsualización de enlaces
+    // Obtener previsualización de enlaces (deshabilitado para evitar errores 401)
     useEffect(() => {
         const fetchPreviews = async () => {
             const newPreviews = {};
@@ -56,27 +55,27 @@ const MessageList = ({ messages = [], onReply, username }) => {
                 const urls = msg.message.match(urlRegex);
                 if (urls) {
                     for (const url of urls) {
+                        // Solo crear preview básica sin llamar a API externa
                         if (!previews[url]) {
                             try {
-                                const response = await axios.get(
-                                    `https://opengraph.io/api/1.1/site/${encodeURIComponent(url)}?app_id=YOUR_APP_ID`
-                                );
-
-                                const ogData = response.data.hybridGraph;
+                                // Preview básica sin llamar API externa
+                                const urlObj = new URL(url);
                                 newPreviews[url] = {
-                                    title: ogData.title || 'Sin título',
-                                    description: ogData.description || 'Sin descripción',
-                                    image: ogData.image || '',
+                                    title: urlObj.hostname,
+                                    description: url,
+                                    image: '',
                                     url: url,
                                 };
                             } catch (error) {
-                                console.error(`Error al obtener previsualización para ${url}:`, error);
+                                console.error(`Error al procesar URL ${url}:`, error);
                             }
                         }
                     }
                 }
             }
-            setPreviews((prev) => ({ ...prev, ...newPreviews }));
+            if (Object.keys(newPreviews).length > 0) {
+                setPreviews((prev) => ({ ...prev, ...newPreviews }));
+            }
         };
 
         fetchPreviews();

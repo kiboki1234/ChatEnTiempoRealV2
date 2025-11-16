@@ -77,18 +77,22 @@ const App = () => {
             setAccepted(true);
         }
 
-        // Obtener parámetros de la URL
+        // Obtener parámetros de la URL solo en la carga inicial
         const urlParams = new URLSearchParams(window.location.search);
         const pin = urlParams.get('pin');
         const name = urlParams.get('room');
 
         if (pin) {
+            console.log('📍 Detectado link de sala en URL:', { pin, name });
             setRoomPin(pin);
             setRoomName(name || 'Sala privada');
             // Aceptar automáticamente el disclaimer si se accede desde un enlace
             if (!hasAccepted) {
                 handleAccept();
             }
+            
+            // Limpiar parámetros de la URL para evitar procesamiento duplicado
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
     }, []);
 
