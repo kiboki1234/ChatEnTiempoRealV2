@@ -7,12 +7,9 @@ const logger = require('../utils/logger');
 
 class SteganographyDetector {
     constructor() {
-        this.ENTROPY_THRESHOLD = 7.4; // Umbral más sensible para imágenes
+        this.ENTROPY_THRESHOLD = 7.5; // High entropy suggests possible steganography
         this.MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-        this.CHI_SQUARE_THRESHOLD = 40; // Umbral más estricto para chi-square
-        this.LSB_CORRELATION_THRESHOLD = 0.05; // Umbral para correlación LSB
-        this.PATTERN_THRESHOLD = 0.3; // Umbral para patrones repetitivos
-        
+        this.CHI_SQUARE_THRESHOLD = 50; // Chi-square threshold for LSB analysis
         this.SUSPICIOUS_PATTERNS = [
             // Common steganography tool signatures
             Buffer.from('OutGuess'),
@@ -22,15 +19,8 @@ class SteganographyDetector {
             Buffer.from('Camouflage'),
             Buffer.from('OpenStego'),
             Buffer.from('Steghide'),
-            Buffer.from('SilentEye'),
-            Buffer.from('OpenPuff'),
-            Buffer.from('S-Tools'),
-            Buffer.from('Invisible Secrets'),
-            Buffer.from('DeepSound'),
-            Buffer.from('snow'),
-            Buffer.from('wbStego')
+            Buffer.from('SilentEye')
         ];
-        
         // Known malicious file signatures
         this.MALICIOUS_SIGNATURES = [
             Buffer.from([0x4D, 0x5A]), // PE executable (MZ header)
@@ -38,36 +28,6 @@ class SteganographyDetector {
             Buffer.from('<?php'), // PHP code
             Buffer.from('<script'), // Embedded scripts
             Buffer.from('eval('), // Eval functions
-            Buffer.from('exec('), // Exec functions
-            Buffer.from('system('), // System calls
-            Buffer.from('passthru('), // Passthru
-            Buffer.from('shell_exec'), // Shell execution
-            Buffer.from('base64_decode'), // Base64 decoding (común en payloads)
-            Buffer.from('gzinflate'), // Compresión (común en ofuscación)
-        ];
-        
-        // Strings sospechosos en código embebido
-        this.SUSPICIOUS_CODE_PATTERNS = [
-            /eval\s*\(/gi,
-            /exec\s*\(/gi,
-            /system\s*\(/gi,
-            /shell_exec/gi,
-            /passthru/gi,
-            /base64_decode/gi,
-            /gzinflate/gi,
-            /str_rot13/gi,
-            /\$_GET\[/gi,
-            /\$_POST\[/gi,
-            /\$_REQUEST\[/gi,
-            /\$_SERVER\[/gi,
-            /<\?php/gi,
-            /<script[^>]*>.*?<\/script>/gis,
-            /javascript:/gi,
-            /onerror\s*=/gi,
-            /onload\s*=/gi,
-            /document\.write/gi,
-            /window\.location/gi,
-            /\.innerHTML/gi
         ];
     }
 
@@ -100,72 +60,37 @@ class SteganographyDetector {
     checkMaliciousSignatures(buffer) {
         const findings = [];
         
-        // Buscar firmas de malware conocidas
         for (const signature of this.MALICIOUS_SIGNATURES) {
-            let index = 0;
-            let count = 0;
-            const positions = [];
-            
-            while ((index = buffer.indexOf(signature, index)) !== -1) {
-                count++;
-                positions.push(index);
-                index += signature.length;
-                if (count > 5) break; // Limitar búsqueda
-            }
-            
-            if (count > 0) {
+            if (buffer.includes(signature)) {
                 findings.push({
                     type: 'MALICIOUS_SIGNATURE',
                     signature: signature.toString('utf-8', 0, Math.min(signature.length, 20)),
-                    count,
-                    positions: positions.slice(0, 3), // Primeras 3 posiciones
                     severity: 'CRITICAL'
                 });
             }
         }
         
-        // Buscar código sospechoso en múltiples encodings
-        const encodings = ['utf-8', 'latin1', 'ascii'];
-        const maxScanSize = Math.min(buffer.length, 50000); // Escanear más datos
+        // Check for suspicious strings
+        const bufferStr = buffer.toString('utf-8', 0, Math.min(buffer.length, 10000));
+        const suspiciousPatterns = [
+            /eval\s*\(/gi,
+            /exec\s*\(/gi,
+            /base64_decode/gi,
+            /system\s*\(/gi,
+            /shell_exec/gi,
+            /<\?php/gi,
+            /\$_GET\[/gi,
+            /\$_POST\[/gi
+        ];
         
-        for (const encoding of encodings) {
-            try {
-                const bufferStr = buffer.toString(encoding, 0, maxScanSize);
-                
-                for (const pattern of this.SUSPICIOUS_CODE_PATTERNS) {
-                    const matches = bufferStr.match(pattern);
-                    if (matches && matches.length > 0) {
-                        findings.push({
-                            type: 'SUSPICIOUS_CODE',
-                            pattern: pattern.toString(),
-                            encoding,
-                            matchCount: matches.length,
-                            samples: matches.slice(0, 2), // Primeros 2 matches
-                            severity: 'HIGH'
-                        });
-                    }
-                }
-            } catch (e) {
-                // Ignorar errores de encoding
-            }
-        }
-        
-        // Buscar URLs sospechosas embebidas
-        try {
-            const bufferStr = buffer.toString('utf-8', 0, maxScanSize);
-            const urlPattern = /https?:\/\/[^\s"'<>]+/gi;
-            const urls = bufferStr.match(urlPattern);
-            
-            if (urls && urls.length > 10) { // Muchas URLs es sospechoso
+        for (const pattern of suspiciousPatterns) {
+            if (pattern.test(bufferStr)) {
                 findings.push({
-                    type: 'SUSPICIOUS_URLS',
-                    count: urls.length,
-                    samples: urls.slice(0, 3),
-                    severity: 'MEDIUM'
+                    type: 'SUSPICIOUS_CODE',
+                    pattern: pattern.toString(),
+                    severity: 'HIGH'
                 });
             }
-        } catch (e) {
-            // Ignorar errores
         }
         
         return findings;
@@ -188,7 +113,7 @@ class SteganographyDetector {
         return findings;
     }
 
-    // Chi-square test mejorado para LSB steganography
+    // Chi-square test for LSB steganography
     chiSquareTest(data) {
         const pairs = new Array(256).fill(0).map(() => [0, 0]);
         
@@ -201,144 +126,18 @@ class SteganographyDetector {
         
         // Calculate chi-square statistic
         let chiSquare = 0;
-        let validPairs = 0;
-        
         for (let i = 0; i < pairs.length; i++) {
             const expected = (pairs[i][0] + pairs[i][1]) / 2;
             if (expected > 0) {
                 chiSquare += Math.pow(pairs[i][0] - expected, 2) / expected;
                 chiSquare += Math.pow(pairs[i][1] - expected, 2) / expected;
-                validPairs++;
             }
         }
         
-        // Normalizar por número de pares válidos
-        const normalizedChi = validPairs > 0 ? chiSquare / validPairs : 0;
-        
         return {
             chiSquare: chiSquare.toFixed(2),
-            normalizedChi: normalizedChi.toFixed(4),
-            validPairs,
             suspicious: chiSquare > this.CHI_SQUARE_THRESHOLD,
-            severity: chiSquare > this.CHI_SQUARE_THRESHOLD * 2 ? 'HIGH' : 
-                     chiSquare > this.CHI_SQUARE_THRESHOLD ? 'MEDIUM' : 'LOW'
-        };
-    }
-    
-    // Análisis de correlación entre bits LSB
-    analyzeLSBCorrelation(data) {
-        const sampleSize = Math.min(data.length, 100000);
-        const step = Math.floor(data.length / sampleSize);
-        
-        let correlation = 0;
-        let count = 0;
-        
-        for (let i = 0; i < data.length - step; i += step) {
-            const lsb1 = data[i] & 1;
-            const lsb2 = data[i + step] & 1;
-            
-            // Calcular correlación entre bits consecutivos
-            if (lsb1 === lsb2) {
-                correlation++;
-            }
-            count++;
-        }
-        
-        const correlationRatio = count > 0 ? correlation / count : 0;
-        
-        // En datos naturales, la correlación debe estar cerca de 0.5
-        // Desviación significativa indica posible esteganografía
-        const deviation = Math.abs(correlationRatio - 0.5);
-        const suspicious = deviation < this.LSB_CORRELATION_THRESHOLD;
-        
-        return {
-            correlationRatio: correlationRatio.toFixed(4),
-            deviation: deviation.toFixed(4),
-            suspicious,
-            reason: suspicious ? 'LSB bits show unnatural correlation' : 'LSB correlation is normal'
-        };
-    }
-    
-    // Análisis de patrones repetitivos (indicador de datos embebidos)
-    analyzePatternRepetition(data) {
-        const patternLength = 16; // Buscar patrones de 16 bytes
-        const patterns = new Map();
-        const sampleSize = Math.min(data.length, 50000);
-        
-        for (let i = 0; i < sampleSize - patternLength; i += patternLength) {
-            const pattern = data.slice(i, i + patternLength).toString('hex');
-            patterns.set(pattern, (patterns.get(pattern) || 0) + 1);
-        }
-        
-        // Encontrar el patrón más repetido
-        let maxRepetitions = 0;
-        let mostRepeatedPattern = null;
-        
-        for (const [pattern, count] of patterns.entries()) {
-            if (count > maxRepetitions) {
-                maxRepetitions = count;
-                mostRepeatedPattern = pattern;
-            }
-        }
-        
-        const totalPatterns = patterns.size;
-        const repetitionRatio = totalPatterns > 0 ? maxRepetitions / totalPatterns : 0;
-        const suspicious = repetitionRatio > this.PATTERN_THRESHOLD;
-        
-        return {
-            maxRepetitions,
-            totalPatterns,
-            repetitionRatio: repetitionRatio.toFixed(4),
-            suspicious,
-            reason: suspicious ? 'Unusual pattern repetition detected' : 'Pattern distribution is normal'
-        };
-    }
-    
-    // Análisis de histograma para detectar distribuciones anormales
-    analyzeHistogram(data) {
-        const histogram = new Array(256).fill(0);
-        
-        // Construir histograma
-        for (let i = 0; i < data.length; i++) {
-            histogram[data[i]]++;
-        }
-        
-        // Calcular estadísticas del histograma
-        const total = data.length;
-        const expectedFreq = total / 256;
-        
-        let chiSquare = 0;
-        let emptyBins = 0;
-        
-        for (let i = 0; i < 256; i++) {
-            if (histogram[i] === 0) {
-                emptyBins++;
-            } else {
-                chiSquare += Math.pow(histogram[i] - expectedFreq, 2) / expectedFreq;
-            }
-        }
-        
-        // Detectar "gaps" sospechosos en el histograma
-        let maxGap = 0;
-        let currentGap = 0;
-        for (let i = 0; i < 256; i++) {
-            if (histogram[i] === 0) {
-                currentGap++;
-            } else {
-                if (currentGap > maxGap) maxGap = currentGap;
-                currentGap = 0;
-            }
-        }
-        
-        // Histograma anormal si tiene muchos bins vacíos o gaps grandes
-        const suspicious = emptyBins > 100 || maxGap > 20 || chiSquare > 10000;
-        
-        return {
-            suspicious,
-            emptyBins,
-            maxGap,
-            chiSquare: chiSquare.toFixed(2),
-            reason: suspicious ? 'Abnormal histogram distribution' : 'Histogram distribution is normal'
+            severity: chiSquare > this.CHI_SQUARE_THRESHOLD * 2 ? 'HIGH' : 'MEDIUM'
         };
     }
 
@@ -393,12 +192,6 @@ class SteganographyDetector {
             // Check LSB (Least Significant Bit) anomalies
             const lsbAnalysis = this.analyzeLSB(data);
             
-            // Análisis de correlación LSB
-            const lsbCorrelation = this.analyzeLSBCorrelation(data);
-            
-            // Análisis de patrones repetitivos
-            const patternAnalysis = this.analyzePatternRepetition(buffer);
-            
             // Check for suspicious metadata
             const metadataAnalysis = this.analyzeMetadata(metadata);
             
@@ -407,9 +200,6 @@ class SteganographyDetector {
             
             // Check for anomalies in file structure
             const structureAnalysis = this.analyzeFileStructure(buffer, metadata.format);
-            
-            // Análisis de histograma de valores
-            const histogramAnalysis = this.analyzeHistogram(data);
             
             // Determine overall risk
             const riskFactors = [];
@@ -424,23 +214,11 @@ class SteganographyDetector {
                 riskScore += 3;
             }
             if (lsbAnalysis.suspicious) {
-                riskFactors.push(`Abnormal LSB distribution (${lsbAnalysis.upperPlanesAnomalies} upper plane anomalies)`);
-                riskScore += 3; // Incrementado
-            }
-            if (lsbCorrelation.suspicious) {
-                riskFactors.push('LSB correlation anomaly');
-                riskScore += 2;
-            }
-            if (patternAnalysis.suspicious) {
-                riskFactors.push('Suspicious pattern repetition');
+                riskFactors.push('Abnormal LSB distribution');
                 riskScore += 2;
             }
             if (metadataAnalysis.suspicious) {
-                riskFactors.push(`Suspicious metadata (${metadataAnalysis.anomalies.length} anomalies)`);
-                riskScore += metadataAnalysis.riskScore || 2;
-            }
-            if (histogramAnalysis.suspicious) {
-                riskFactors.push('Abnormal histogram distribution');
+                riskFactors.push('Suspicious metadata');
                 riskScore += 2;
             }
             if (channelAnalysis.suspicious) {
@@ -456,8 +234,8 @@ class SteganographyDetector {
                 riskScore += 4;
             }
             
-            const suspicious = riskScore >= 5; // Umbral ajustado para mejor detección
-            const severity = riskScore >= 9 ? 'CRITICAL' : riskScore >= 5 ? 'HIGH' : riskScore >= 3 ? 'MEDIUM' : 'LOW';
+            const suspicious = riskScore >= 4; // Threshold for rejection
+            const severity = riskScore >= 7 ? 'CRITICAL' : riskScore >= 4 ? 'HIGH' : 'MEDIUM';
             
             return {
                 suspicious,
@@ -468,12 +246,9 @@ class SteganographyDetector {
                 fileHash,
                 chiSquareResult,
                 lsbAnalysis,
-                lsbCorrelation,
-                patternAnalysis,
                 metadataAnalysis,
                 channelAnalysis,
                 structureAnalysis,
-                histogramAnalysis,
                 stegoFindings,
                 fileInfo: {
                     format: metadata.format,
@@ -557,144 +332,46 @@ class SteganographyDetector {
         };
     }
 
-    // Análisis LSB mejorado con múltiples técnicas
+    // Analyze LSB (Least Significant Bit) patterns
     analyzeLSB(data) {
         const lsbCount = { 0: 0, 1: 0 };
-        const planeCount = new Array(8).fill(0).map(() => ({ 0: 0, 1: 0 }));
+        let anomalies = 0;
         
-        // Analizar todos los planos de bits, no solo LSB
-        const sampleSize = Math.min(data.length, 100000);
-        const step = Math.max(1, Math.floor(data.length / sampleSize));
-        
-        for (let i = 0; i < data.length; i += step) {
-            const byte = data[i];
-            
-            // Analizar cada plano de bits
-            for (let bit = 0; bit < 8; bit++) {
-                const bitValue = (byte >> bit) & 1;
-                planeCount[bit][bitValue]++;
-            }
-            
-            // LSB específico
-            const lsb = byte & 1;
+        // Sample every 100th pixel to improve performance
+        for (let i = 0; i < data.length; i += 100) {
+            const lsb = data[i] & 1;
             lsbCount[lsb]++;
         }
         
-        // Calcular ratios para cada plano
-        const planeRatios = planeCount.map((count, bit) => {
-            const total = count[0] + count[1];
-            const ratio = total > 0 ? Math.abs(count[0] - count[1]) / total : 0;
-            return { bit, ratio, count };
-        });
-        
-        // Distribución LSB
+        // In natural images, LSB should be roughly 50/50
         const total = lsbCount[0] + lsbCount[1];
-        const lsbRatio = total > 0 ? Math.abs(lsbCount[0] - lsbCount[1]) / total : 0;
+        const ratio = Math.abs(lsbCount[0] - lsbCount[1]) / total;
         
-        // Detectar anomalías en planos superiores (más sospechoso)
-        const upperPlanesAnomalies = planeRatios.slice(0, 4).filter(p => p.ratio > 0.6).length;
-        const lowerPlanesAnomalies = planeRatios.slice(4).filter(p => p.ratio > 0.5).length;
-        
-        // Calcular varianza entre planos (baja varianza = sospechoso)
-        const ratios = planeRatios.map(p => p.ratio);
-        const avgRatio = ratios.reduce((a, b) => a + b, 0) / ratios.length;
-        const variance = ratios.reduce((sum, r) => sum + Math.pow(r - avgRatio, 2), 0) / ratios.length;
-        
-        const suspicious = 
-            lsbRatio > 0.55 || // Distribución LSB sesgada
-            upperPlanesAnomalies >= 2 || // Anomalías en bits superiores
-            variance < 0.01; // Varianza muy baja entre planos
+        // If ratio is too skewed, it might indicate steganography
+        const suspicious = ratio > 0.6;
         
         return {
             suspicious,
-            lsbRatio: lsbRatio.toFixed(3),
+            ratio: ratio.toFixed(3),
             distribution: lsbCount,
-            planeRatios: planeRatios.map(p => ({ bit: p.bit, ratio: p.ratio.toFixed(3) })),
-            upperPlanesAnomalies,
-            lowerPlanesAnomalies,
-            variance: variance.toFixed(4),
-            reason: suspicious ? 
-                `Abnormal bit plane distribution (LSB: ${lsbRatio.toFixed(3)}, Upper anomalies: ${upperPlanesAnomalies})` : 
-                'Bit plane distribution appears normal'
+            reason: suspicious ? 'Abnormal LSB distribution detected' : 'LSB distribution appears normal'
         };
     }
 
-    // Análisis de metadata mejorado
+    // Analyze metadata for suspicious patterns
     analyzeMetadata(metadata) {
-        const anomalies = [];
-        let riskScore = 0;
-        
-        // Densidad inusual
-        if (metadata.density && metadata.density > 1000) {
-            anomalies.push('Unusually high density');
-            riskScore += 2;
-        }
-        
-        // Demasiados tags EXIF
-        const exifCount = metadata.exif ? Object.keys(metadata.exif).length : 0;
-        if (exifCount > 50) {
-            anomalies.push(`Excessive EXIF tags (${exifCount})`);
-            riskScore += 2;
-        }
-        
-        // Perfil ICC muy grande
-        if (metadata.icc && metadata.icc.length > 100000) {
-            anomalies.push(`Large ICC profile (${Math.round(metadata.icc.length / 1024)}KB)`);
-            riskScore += 3;
-        }
-        
-        // Metadata inusualmente grande en relación al archivo
-        if (metadata.size && exifCount > 0) {
-            const exifSize = exifCount * 100; // Estimación aproximada
-            const metadataRatio = exifSize / metadata.size;
-            
-            if (metadataRatio > 0.1) { // Más del 10% es metadata
-                anomalies.push('Metadata to file size ratio is unusually high');
-                riskScore += 2;
-            }
-        }
-        
-        // Buscar campos EXIF sospechosos
-        if (metadata.exif) {
-            const suspiciousFields = [
-                'UserComment',
-                'MakerNote',
-                'ImageDescription',
-                'XPComment',
-                'XPKeywords'
-            ];
-            
-            for (const field of suspiciousFields) {
-                if (metadata.exif[field]) {
-                    const value = metadata.exif[field];
-                    if (value && typeof value === 'string' && value.length > 1000) {
-                        anomalies.push(`Suspicious EXIF field: ${field} (${value.length} chars)`);
-                        riskScore += 2;
-                    }
-                }
-            }
-        }
-        
-        // Orientación inusual o corrupta
-        if (metadata.orientation && (metadata.orientation < 1 || metadata.orientation > 8)) {
-            anomalies.push('Invalid orientation value');
-            riskScore += 1;
-        }
-        
-        const suspicious = riskScore >= 3;
+        const suspicious = 
+            metadata.density > 1000 || // Unusually high density
+            (metadata.exif && Object.keys(metadata.exif).length > 50) || // Too many EXIF tags
+            (metadata.icc && metadata.icc.length > 100000); // Large ICC profile
         
         return {
             suspicious,
-            riskScore,
-            anomalies,
             reason: suspicious ? 'Unusual metadata patterns detected' : 'Metadata appears normal',
             details: {
                 hasExif: !!metadata.exif,
-                exifCount,
                 hasIcc: !!metadata.icc,
-                iccSize: metadata.icc ? metadata.icc.length : 0,
-                density: metadata.density,
-                orientation: metadata.orientation
+                density: metadata.density
             }
         };
     }
@@ -888,7 +565,7 @@ class SteganographyDetector {
             // Add metadata
             result.timestamp = new Date();
             result.fileType = fileType;
-            result.analyzedBy = 'SteganographyDetector v3.0 - Enhanced Detection';
+            result.analyzedBy = 'SteganographyDetector v2.0';
             
             // Log analysis result
             await AuditLog.create({

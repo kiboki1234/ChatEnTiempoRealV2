@@ -190,7 +190,7 @@ router.post('/upload', (req, res, next) => {
             analysisResult = await steganographyWorkerPool.executeTask({
                 filePath: tempFilePath,
                 fileType: req.file.mimetype,
-                threshold: 7.4  // Umbral más estricto para mejor detección
+                threshold: 7.95  // Higher threshold for better accuracy
             });
         } catch (workerError) {
             logger.error('Worker pool error during file analysis', { error: workerError.message });
@@ -245,7 +245,7 @@ router.post('/upload', (req, res, next) => {
             // Adjust entropy thresholds based on file type
             const entropyThresholds = isCompressedFormat 
                 ? { critical: 7.95, high: 7.85, elevated: 7.75 }  // More lenient for compressed files
-                : { critical: 7.6, high: 7.4, elevated: 7.2 };     // Más estricto para imágenes
+                : { critical: 7.7, high: 7.4, elevated: 7.0 };     // Stricter for uncompressed files
             
             // Calculate risk score based on entropy
             const entropy = parseFloat(analysis.entropy);
@@ -253,23 +253,17 @@ router.post('/upload', (req, res, next) => {
                 analysis.riskScore += 4;
                 analysis.riskFactors.push('Extremely high entropy detected');
             } else if (entropy > entropyThresholds.high) {
-                analysis.riskScore += 3; // Incrementado
+                analysis.riskScore += 2;
                 analysis.riskFactors.push('High entropy detected');
             } else if (entropy > entropyThresholds.elevated) {
-                analysis.riskScore += 2; // Incrementado
+                analysis.riskScore += 1;
                 analysis.riskFactors.push('Elevated entropy');
             }
             
             // Add risk for LSB anomalies (images only)
             if (analysis.lsbAnalysis?.suspicious) {
                 analysis.riskScore += 3;
-                analysis.riskFactors.push(`LSB pattern anomaly (${analysis.lsbAnalysis.upperPlanesAnomalies || 0} upper plane anomalies)`);
-            }
-            
-            // Add risk for LSB correlation anomalies
-            if (analysis.lsbCorrelation?.suspicious) {
-                analysis.riskScore += 2;
-                analysis.riskFactors.push('LSB correlation anomaly');
+                analysis.riskFactors.push('LSB pattern anomaly');
             }
             
             // Add risk for channel anomalies (images only)
@@ -306,7 +300,7 @@ router.post('/upload', (req, res, next) => {
             }
             
             // Determine severity based on risk score
-            if (analysis.riskScore >= 9) {
+            if (analysis.riskScore >= 8) {
                 analysis.severity = 'CRITICAL';
             } else if (analysis.riskScore >= 5) {
                 analysis.severity = 'HIGH';
@@ -316,8 +310,8 @@ router.post('/upload', (req, res, next) => {
                 analysis.severity = 'LOW';
             }
             
-            // Update suspicious flag based on risk score (umbral ajustado)
-            if (analysis.riskScore >= 5) {
+            // Update suspicious flag based on risk score (raised threshold)
+            if (analysis.riskScore >= 6) {
                 analysis.suspicious = true;
             } else {
                 analysis.suspicious = false;  // Override worker's decision with our scoring
