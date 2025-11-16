@@ -1,0 +1,95 @@
+name: Package Lock Validation
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - '**/package.json'
+      - '**/package-lock.json'
+  push:
+    branches: [ main, develop ]
+    paths:
+      - '**/package.json'
+      - '**/package-lock.json'
+  workflow_dispatch:
+
+jobs:
+  validate-lockfiles:
+    name: Validate Package Lock Files
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+      
+      - name: Validate Backend Lock File
+        run: |
+          cd backend
+          echo "🔍 Validating backend/package-lock.json..."
+          
+          if [ ! -f package-lock.json ]; then
+            echo "❌ package-lock.json not found!"
+            exit 1
+          fi
+          
+          # Test if npm ci works (dry-run)
+          npm ci --dry-run || {
+            echo "❌ package-lock.json is out of sync with package.json"
+            echo ""
+            echo "📝 To fix this, run locally:"
+            echo "   cd backend"
+            echo "   npm install"
+            echo "   git add package-lock.json"
+            echo "   git commit -m 'fix: sync package-lock.json'"
+            echo "   git push"
+            exit 1
+          }
+          
+          echo "✅ Backend lock file is valid"
+      
+      - name: Validate Frontend Lock File
+        run: |
+          cd frontend
+          echo "🔍 Validating frontend/package-lock.json..."
+          
+          if [ ! -f package-lock.json ]; then
+            echo "❌ package-lock.json not found!"
+            exit 1
+          fi
+          
+          # Test if npm ci works (dry-run)
+          npm ci --dry-run || {
+            echo "❌ package-lock.json is out of sync with package.json"
+            echo ""
+            echo "📝 To fix this, run locally:"
+            echo "   cd frontend"
+            echo "   npm install"
+            echo "   git add package-lock.json"
+            echo "   git commit -m 'fix: sync package-lock.json'"
+            echo "   git push"
+            exit 1
+          }
+          
+          echo "✅ Frontend lock file is valid"
+      
+      - name: Check for Uncommitted Changes
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "⚠️ Warning: Uncommitted changes detected after validation"
+            git status
+          else
+            echo "✅ No uncommitted changes"
+          fi
+      
+      - name: Summary
+        run: |
+          echo "📊 Validation Summary:"
+          echo "✅ Backend package-lock.json: Valid"
+          echo "✅ Frontend package-lock.json: Valid"
+          echo "✅ Both lock files are in sync with package.json"

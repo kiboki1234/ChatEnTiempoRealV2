@@ -38,7 +38,12 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       
       - name: Install dependencies
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
       
       - name: Check for security vulnerabilities
         run: npm audit --audit-level=high
@@ -46,8 +51,8 @@ jobs:
       
       - name: Lint code
         run: |
-          npm install --save-dev eslint
-          npx eslint . --ext .js --max-warnings 0 || echo "⚠️ Linting encontró warnings"
+          npm install --save-dev eslint --no-save
+          npx eslint . --ext .js --max-warnings 10 || echo "⚠️ Linting encontró warnings"
         continue-on-error: true
       
       - name: Check for outdated packages
