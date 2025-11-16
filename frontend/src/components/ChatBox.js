@@ -151,18 +151,17 @@ const ChatBox = ({ initialRoomPin }) => {
 
         // Escuchar eventos de sala
         socket.on('roomJoined', async (room) => {
-            console.log('🔐 Sala unida:', room.pin);
-            console.log('🔑 Clave recibida:', room.encryptionKey ? 'SÍ (length: ' + room.encryptionKey.length + ')' : 'NO (sala legacy)');
+            console.log('🔐 Sala unida con cifrado E2E:', room.pin);
             setCurrentRoom(room.pin);
             setRoomInfo(room);
             
-            // Initialize crypto service and set room encryption key ONLY for new rooms
+            // Initialize crypto service and set room encryption key
             if (room.encryptionKey) {
                 await cryptoService.initialize();
                 cryptoService.setRoomKey(room.pin, room.encryptionKey);
-                console.log('✅ Clave de cifrado E2E establecida para sala nueva', room.pin);
+                console.log('✅ Clave de cifrado E2E establecida para sala', room.pin);
             } else {
-                console.log('📝 Sala legacy sin E2E:', room.pin);
+                console.warn('⚠️ No se recibió clave de cifrado para la sala');
             }
             
             if (room.participants) {
@@ -173,29 +172,28 @@ const ChatBox = ({ initialRoomPin }) => {
             fetch(`${process.env.REACT_APP_SOCKET_SERVER_URL}/api/chat?roomPin=${room.pin}`)
                 .then(response => response.json())
                 .then(async (data) => {
-                    // Decrypt messages ONLY if room has encryption key and message is encrypted
-                    const processedMessages = await Promise.all(
+                    // Decrypt historical messages (only if they have encrypted data)
+                    const decryptedMessages = await Promise.all(
                         data.map(async (msg) => {
-                            // Solo intentar descifrar si la sala tiene clave Y el mensaje está encriptado
-                            if (room.encryptionKey && msg.encryptedMessage && msg.encryptedMessage.ciphertext && msg.encryptedMessage.nonce) {
+                            if (msg.encryptedMessage && msg.encryptedMessage.ciphertext && msg.encryptedMessage.nonce) {
                                 try {
                                     const decrypted = await cryptoService.decryptMessage(
                                         msg.encryptedMessage,
                                         room.pin
                                     );
                                     msg.message = decrypted;
-                                    console.log('🔓 Mensaje E2E descifrado');
+                                    console.log('🔓 Mensaje histórico descifrado');
                                 } catch (error) {
-                                    console.error('❌ Error descifrando mensaje:', error);
+                                    console.error('❌ Error descifrando mensaje histórico:', error);
                                     msg.message = '[Error: No se pudo descifrar]';
                                 }
                             }
-                            // Para mensajes legacy o sin encriptar, usar el mensaje en texto plano
+                            // Si no tiene encryptedMessage, usar el mensaje en texto plano (legacy)
                             return msg;
                         })
                     );
-                    setMessages(processedMessages);
-                    console.log('📜 Mensajes cargados:', processedMessages.length);
+                    setMessages(decryptedMessages);
+                    console.log('📜 Mensajes cargados:', decryptedMessages.length);
                 })
                 .catch(error => {
                     console.error('Error cargando mensajes:', error);
@@ -209,11 +207,6 @@ const ChatBox = ({ initialRoomPin }) => {
             }
             if (room) {
                 setRoomInfo(room);
-                // Update encryption key ONLY for new rooms (those with encryptionKey)
-                if (room.encryptionKey && room.pin) {
-                    cryptoService.setRoomKey(room.pin, room.encryptionKey);
-                    console.log('🔑 Clave E2E actualizada para sala nueva', room.pin);
-                }
             }
         });
 
@@ -234,21 +227,21 @@ const ChatBox = ({ initialRoomPin }) => {
 
         socket.on('receiveMessage', async (message) => {
             if (message.roomPin === currentRoom) {
-                // Decrypt message ONLY if room has encryption key AND message is encrypted
-                if (roomInfo?.encryptionKey && message.encryptedMessage && message.encryptedMessage.ciphertext && message.encryptedMessage.nonce) {
+                // Decrypt message if it's encrypted (has valid encrypted data)
+                if (message.encryptedMessage && message.encryptedMessage.ciphertext && message.encryptedMessage.nonce) {
                     try {
                         const decrypted = await cryptoService.decryptMessage(
                             message.encryptedMessage,
                             currentRoom
                         );
                         message.message = decrypted;
-                        console.log('🔓 Mensaje E2E descifrado en tiempo real');
+                        console.log('🔓 Mensaje descifrado en tiempo real');
                     } catch (error) {
                         console.error('❌ Error descifrando mensaje:', error);
                         message.message = '[Error: No se pudo descifrar el mensaje]';
                     }
                 }
-                // Para salas legacy o mensajes sin encriptar, usar el mensaje en texto plano
+                // Si no tiene encryptedMessage, usar el mensaje en texto plano (legacy)
                 
                 setMessages((prev) => [...prev, message]);
                 if (message.username !== username) {

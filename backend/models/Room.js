@@ -83,13 +83,8 @@ const roomSchema = new mongoose.Schema({
     },
     encryptionKey: {
         type: String,
-        required: false, // Optional - only new rooms will have this
-        select: false, // Don't return by default in queries for security
-        default: function() {
-            // Only generate key for new rooms (created after E2E implementation)
-            // This ensures old rooms remain without encryption
-            return crypto.randomBytes(32).toString('hex');
-        }
+        required: false, // Optional for backward compatibility with old rooms
+        select: false // Don't return by default in queries for security
     },
     participants: [{
         socketId: String,
@@ -100,7 +95,11 @@ const roomSchema = new mongoose.Schema({
         },
         ipAddress: String,
         deviceFingerprint: String
-    }]
+    }],
+    encryptionKey: {
+        type: String,
+        default: () => crypto.randomBytes(32).toString('hex')
+    }
 });
 
 // Hash PIN before validation (ensures pinHash is set before required check)

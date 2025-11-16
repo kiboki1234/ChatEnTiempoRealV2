@@ -421,16 +421,13 @@ module.exports = (server) => {
                 socket.roomPin = pin;
                 socket.username = username;
 
-                // Get E2E encryption key from database
-                let encryptionKey = null;
-                if (pin !== 'general') {
-                    const roomWithKey = await Room.findOne({ pin }).select('+encryptionKey');
-                    encryptionKey = roomWithKey?.encryptionKey || null;
-                }
+                // Send room encryption key to client (in production, use proper key exchange)
+                const roomKey = encryptionService.getRoomKey(pin) || 
+                               encryptionService.generateRoomKey(pin);
 
                 socket.emit('roomJoined', {
                     ...roomToObject(room),
-                    encryptionKey: encryptionKey
+                    encryptionKey: roomKey.toString('hex')
                 });
 
                 if (pin !== 'general') {
@@ -615,13 +612,9 @@ module.exports = (server) => {
                     }
                 });
                 
-                // Emit room without encryption key to all clients (for room list)
-                const { encryptionKey, ...roomWithoutKey } = room;
-                io.emit('roomCreated', roomWithoutKey);
-                
-                // Send complete room with encryption key only to creator
+                io.emit('roomCreated', room);
                 socket.emit('roomCreated', { 
-                    ...room, // Include encryptionKey for creator
+                    ...roomToObject(room), 
                     autoJoin: true,
                     userStats: {
                         remainingRooms: permission.remainingRooms,
