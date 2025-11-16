@@ -39,10 +39,17 @@ module.exports = (server) => {
             credentials: true
         },
         transports: ['websocket', 'polling'],
-        pingTimeout: 20000,
-        pingInterval: 25000,
+        pingTimeout: 60000,  // 60s (aumentado para Render)
+        pingInterval: 25000, // 25s
         cookie: false,
-        allowEIO3: true
+        allowEIO3: true,
+        connectTimeout: 45000,
+        upgradeTimeout: 30000,
+        maxHttpBufferSize: 1e6,
+        // Configuración para mantener conexiones vivas
+        perMessageDeflate: {
+            threshold: 1024
+        }
     });
 
     const emitRoomUpdate = (room) => {

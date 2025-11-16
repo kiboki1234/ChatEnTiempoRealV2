@@ -1,0 +1,56 @@
+name: Keep Alive - Render Backend
+
+on:
+  schedule:
+    # Ejecutar cada 10 minutos (máximo de GitHub Actions Free)
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Permite ejecución manual
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: Ping Backend
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://chatentiemporealv2.onrender.com' }}
+        run: |
+          echo "🔄 Pinging backend..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -H "User-Agent: GitHub-Actions-Keep-Alive" \
+            ${BACKEND_URL}/api/keep-alive)
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+          
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Ping successful!"
+            echo "Response: $BODY"
+          else
+            echo "⚠️ Unexpected status code: $HTTP_CODE"
+            echo "Response: $BODY"
+            exit 1
+          fi
+      
+      - name: Check Health Endpoint
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://chatentiemporealv2.onrender.com' }}
+        run: |
+          echo "🏥 Checking health endpoint..."
+          HEALTH=$(curl -s ${BACKEND_URL}/health)
+          echo "Health: $HEALTH"
+          
+          STATUS=$(echo $HEALTH | jq -r '.status')
+          if [ "$STATUS" = "healthy" ]; then
+            echo "✅ Backend is healthy"
+            UPTIME=$(echo $HEALTH | jq -r '.uptime')
+            echo "Uptime: ${UPTIME}s"
+          else
+            echo "❌ Backend health check failed"
+            exit 1
+          fi
+      
+      - name: Log Timestamp
+        run: |
+          echo "⏰ Last ping: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"

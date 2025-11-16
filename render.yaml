@@ -1,0 +1,62 @@
+# Render Configuration
+# https://render.com/docs/yaml-spec
+
+services:
+  # Backend Service
+  - type: web
+    name: chat-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    
+    # Environment Variables
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: RENDER
+        value: true
+      
+      # MongoDB (configure in Render Dashboard)
+      - key: MONGODB_URI
+        sync: false
+      
+      # Frontend URL
+      - key: FRONTEND_URL
+        sync: false
+      
+      # JWT Secrets
+      - key: JWT_SECRET
+        generateValue: true
+      - key: REFRESH_TOKEN_SECRET
+        generateValue: true
+      
+      # Cloudinary
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+    
+    # Auto-deploy
+    autoDeploy: true
+    
+    # Health Check Configuration
+    healthCheckPath: /health
+    
+    # Instance Configuration
+    plan: free
+    region: oregon # Change based on your location
+    
+    # Scaling
+    numInstances: 1
+    
+    # Build Settings
+    buildFilter:
+      paths:
+        - backend/**
+        - package.json
+        - package-lock.json

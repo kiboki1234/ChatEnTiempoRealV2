@@ -31,6 +31,10 @@ const uploadMiddleware = require('./middlewares/uploadMiddleware');
 const app = express();
 const server = http.createServer(app);
 
+// Configurar keep-alive para prevenir timeouts en Render
+server.keepAliveTimeout = 65000; // 65s (mayor que pingInterval de Socket.IO)
+server.headersTimeout = 66000;   // 66s (mayor que keepAliveTimeout)
+
 // Security Middlewares
 app.use(helmet({
     contentSecurityPolicy: {
@@ -85,12 +89,30 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Trust proxy (important for IP detection behind load balancers)
 app.set('trust proxy', 1);
 
-// Health check endpoint
+// Health check endpoint (con keep-alive headers)
 app.get('/health', (req, res) => {
+    res.set({
+        'Connection': 'keep-alive',
+        'Keep-Alive': 'timeout=5, max=1000'
+    });
     res.status(200).json({ 
         status: 'healthy',
         timestamp: new Date().toISOString(),
-        uptime: process.uptime()
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        connections: server.getConnections ? 'available' : 'unavailable'
+    });
+});
+
+// Keep-alive endpoint (previene sleep en Render)
+app.get('/api/keep-alive', (req, res) => {
+    res.set({
+        'Connection': 'keep-alive',
+        'Keep-Alive': 'timeout=5, max=1000'
+    });
+    res.status(200).json({ 
+        status: 'alive',
+        timestamp: Date.now()
     });
 });
 
@@ -210,4 +232,25 @@ server.listen(PORT, () => {
     logger.info(`Server running on port ${PORT}`);
     logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
     logger.info('Socket.IO server initialized');
+    
+    // Auto-ping interno para prevenir sleep en Render (solo en producción)
+    if (process.env.NODE_ENV === 'production' && process.env.RENDER) {
+        const SELF_PING_INTERVAL = 10 * 60 * 1000; // 10 minutos
+        const selfPingTimer = setInterval(() => {
+            const startTime = Date.now();
+            http.get(`http://localhost:${PORT}/health`, (res) => {
+                const latency = Date.now() - startTime;
+                logger.info('Self-ping successful', { latency: `${latency}ms` });
+            }).on('error', (err) => {
+                logger.warn('Self-ping failed', { error: err.message });
+            });
+        }, SELF_PING_INTERVAL);
+        
+        // Limpiar timer en shutdown
+        process.on('SIGTERM', () => {
+            clearInterval(selfPingTimer);
+        });
+        
+        logger.info('Self-ping mechanism enabled', { interval: '10 minutes' });
+    }
 }); 
