@@ -400,8 +400,8 @@ const ChatBox = ({ initialRoomPin }) => {
                             {autoJoining ? 'Uniéndose a la sala...' : roomInfo.name}
                         </h1>
                         <div className="header-buttons">
-                            {/* Todos los usuarios pueden acceder a configuración */}
-                            {!localStorage.getItem('isGuest') && (
+                            {/* Todos los usuarios pueden acceder a configuración (excepto invitados) */}
+                            {localStorage.getItem('isGuest') !== 'true' && (
                                 <button 
                                     className="admin-settings-button" 
                                     onClick={() => setShowAdminPanel(true)}
