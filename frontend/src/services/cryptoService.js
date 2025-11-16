@@ -24,16 +24,53 @@ class CryptoService {
       key = sodium.from_hex(key);
     }
     this.roomKeys.set(roomPin, key);
+    
+    // Persistir en sessionStorage para sobrevivir desconexiones
+    try {
+      const keyHex = sodium.to_hex(key);
+      const persistedKeys = JSON.parse(sessionStorage.getItem('roomKeys') || '{}');
+      persistedKeys[roomPin] = keyHex;
+      sessionStorage.setItem('roomKeys', JSON.stringify(persistedKeys));
+      console.log('💾 Clave de sala persistida:', roomPin);
+    } catch (error) {
+      console.error('Error persistiendo clave:', error);
+    }
   }
 
   // Obtener la clave de una sala
   getRoomKey(roomPin) {
-    return this.roomKeys.get(roomPin);
+    let key = this.roomKeys.get(roomPin);
+    
+    // Si no está en memoria, intentar restaurar desde sessionStorage
+    if (!key) {
+      try {
+        const persistedKeys = JSON.parse(sessionStorage.getItem('roomKeys') || '{}');
+        if (persistedKeys[roomPin]) {
+          key = sodium.from_hex(persistedKeys[roomPin]);
+          this.roomKeys.set(roomPin, key);
+          console.log('🔄 Clave de sala restaurada desde sessionStorage:', roomPin);
+        }
+      } catch (error) {
+        console.error('Error restaurando clave:', error);
+      }
+    }
+    
+    return key;
   }
 
   // Limpiar la clave de una sala
   clearRoomKey(roomPin) {
     this.roomKeys.delete(roomPin);
+    
+    // Limpiar también de sessionStorage
+    try {
+      const persistedKeys = JSON.parse(sessionStorage.getItem('roomKeys') || '{}');
+      delete persistedKeys[roomPin];
+      sessionStorage.setItem('roomKeys', JSON.stringify(persistedKeys));
+      console.log('🗑️ Clave de sala eliminada:', roomPin);
+    } catch (error) {
+      console.error('Error limpiando clave persistida:', error);
+    }
   }
 
   // Cifrar un mensaje para una sala (cifrado simétrico)

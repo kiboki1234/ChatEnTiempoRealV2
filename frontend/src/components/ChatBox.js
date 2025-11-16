@@ -154,6 +154,9 @@ const ChatBox = ({ initialRoomPin }) => {
             setCurrentRoom(room.pin);
             setRoomInfo(room);
             
+            // Guardar sala actual en sessionStorage para reconexión
+            sessionStorage.setItem('currentRoom', room.pin);
+            
             // Initialize crypto service and set room encryption key FIRST
             if (room.encryptionKey) {
                 await cryptoService.initialize();
@@ -304,6 +307,19 @@ const ChatBox = ({ initialRoomPin }) => {
             window.location.reload();
         });
 
+        // Manejar reconexión automática
+        socket.on('reconnect', (attemptNumber) => {
+            console.log(`✅ Socket reconectado después de ${attemptNumber} intentos`);
+            
+            // Restaurar sesión: re-unirse a la sala actual
+            const savedRoom = sessionStorage.getItem('currentRoom');
+            
+            if (savedRoom && username) {
+                console.log('🔄 Re-uniéndose a sala después de reconexión:', savedRoom);
+                socket.emit('joinRoom', { pin: savedRoom, username: username });
+            }
+        });
+
         // Después de registrar todos los listeners, decidir si unirse a una sala
         // NO unirse automáticamente a general si hay un initialRoomPin pendiente
         if (initialRoomPin) {
@@ -324,6 +340,7 @@ const ChatBox = ({ initialRoomPin }) => {
             socket.off('sessionError');
             socket.off('roomError');
             socket.off('replacedByRegisteredUser');
+            socket.off('reconnect');
         };
     }, [currentRoom, username, initialRoomPin]);
 
