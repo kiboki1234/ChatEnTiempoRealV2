@@ -20,23 +20,75 @@ function calculateEntropy(data) {
     return entropy;
 }
 
-// Analyze LSB patterns
+// Análisis LSB mejorado
 function analyzeLSB(data) {
     const lsbCount = { 0: 0, 1: 0 };
+    const planeCount = new Array(8).fill(0).map(() => ({ 0: 0, 1: 0 }));
     
-    for (let i = 0; i < data.length; i += 100) {
-        const lsb = data[i] & 1;
+    const sampleSize = Math.min(data.length, 100000);
+    const step = Math.max(1, Math.floor(data.length / sampleSize));
+    
+    for (let i = 0; i < data.length; i += step) {
+        const byte = data[i];
+        
+        // Analizar cada plano de bits
+        for (let bit = 0; bit < 8; bit++) {
+            const bitValue = (byte >> bit) & 1;
+            planeCount[bit][bitValue]++;
+        }
+        
+        const lsb = byte & 1;
         lsbCount[lsb]++;
     }
     
-    const total = lsbCount[0] + lsbCount[1];
-    const ratio = Math.abs(lsbCount[0] - lsbCount[1]) / total;
-    const suspicious = ratio > 0.6;
+    // Calcular ratios
+    const planeRatios = planeCount.map((count, bit) => {
+        const total = count[0] + count[1];
+        const ratio = total > 0 ? Math.abs(count[0] - count[1]) / total : 0;
+        return { bit, ratio };
+    });
     
-    return { suspicious, ratio, distribution: lsbCount };
+    const total = lsbCount[0] + lsbCount[1];
+    const lsbRatio = total > 0 ? Math.abs(lsbCount[0] - lsbCount[1]) / total : 0;
+    
+    const upperPlanesAnomalies = planeRatios.slice(0, 4).filter(p => p.ratio > 0.6).length;
+    
+    const suspicious = lsbRatio > 0.55 || upperPlanesAnomalies >= 2;
+    
+    return { 
+        suspicious, 
+        lsbRatio: lsbRatio.toFixed(3), 
+        distribution: lsbCount,
+        upperPlanesAnomalies
+    };
 }
 
-async function analyzeImage(filePath, threshold = 7.5) {
+// Análisis de correlación LSB
+function analyzeLSBCorrelation(data) {
+    const sampleSize = Math.min(data.length, 100000);
+    const step = Math.floor(data.length / sampleSize);
+    
+    let correlation = 0;
+    let count = 0;
+    
+    for (let i = 0; i < data.length - step; i += step) {
+        const lsb1 = data[i] & 1;
+        const lsb2 = data[i + step] & 1;
+        
+        if (lsb1 === lsb2) {
+            correlation++;
+        }
+        count++;
+    }
+    
+    const correlationRatio = count > 0 ? correlation / count : 0;
+    const deviation = Math.abs(correlationRatio - 0.5);
+    const suspicious = deviation < 0.05;
+    
+    return { correlationRatio, deviation, suspicious };
+}
+
+async function analyzeImage(filePath, threshold = 7.4) {
     try {
         const stats = await fs.stat(filePath);
         const metadata = await sharp(filePath).metadata();
@@ -47,6 +99,7 @@ async function analyzeImage(filePath, threshold = 7.5) {
         
         const entropy = calculateEntropy(data);
         const lsbAnalysis = analyzeLSB(data);
+        const lsbCorrelation = analyzeLSBCorrelation(data);
         
         // Analyze color channels
         let channelAnalysis = { suspicious: false };
@@ -88,6 +141,7 @@ async function analyzeImage(filePath, threshold = 7.5) {
         const suspicious = 
             entropy > threshold ||
             lsbAnalysis.suspicious ||
+            lsbCorrelation.suspicious ||
             channelAnalysis.suspicious;
         
         return {
@@ -96,6 +150,7 @@ async function analyzeImage(filePath, threshold = 7.5) {
                 suspicious,
                 entropy: entropy.toFixed(3),
                 lsbAnalysis,
+                lsbCorrelation,
                 channelAnalysis,
                 fileInfo: {
                     format: metadata.format,
