@@ -310,11 +310,11 @@ router.post('/upload', (req, res, next) => {
                 analysis.severity = 'LOW';
             }
             
-            // Update suspicious flag based on risk score (raised threshold)
-            if (analysis.riskScore >= 6) {
+            // Update suspicious flag based on risk score - UMBRAL REDUCIDO A 3
+            if (analysis.riskScore >= 3) {
                 analysis.suspicious = true;
             } else {
-                analysis.suspicious = false;  // Override worker's decision with our scoring
+                analysis.suspicious = false;
             }
         }
         
