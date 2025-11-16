@@ -148,6 +148,9 @@ const ChatBox = ({ initialRoomPin }) => {
         // Escuchar eventos de sala
         socket.on('roomJoined', async (room) => {
             console.log('🔐 Sala unida con cifrado E2E:', room.pin);
+            
+            // Limpiar mensajes de la sala anterior primero
+            setMessages([]);
             setCurrentRoom(room.pin);
             setRoomInfo(room);
             
@@ -222,27 +225,29 @@ const ChatBox = ({ initialRoomPin }) => {
         });
 
         socket.on('receiveMessage', async (message) => {
-            if (message.roomPin === currentRoom) {
-                // Decrypt message if it's encrypted (has valid encrypted data)
-                if (message.encryptedMessage && message.encryptedMessage.ciphertext && message.encryptedMessage.nonce) {
-                    try {
-                        const decrypted = await cryptoService.decryptMessage(
-                            message.encryptedMessage,
-                            currentRoom
-                        );
-                        message.message = decrypted;
-                        console.log('🔓 Mensaje descifrado en tiempo real');
-                    } catch (error) {
-                        console.error('❌ Error descifrando mensaje:', error);
-                        message.message = '[Error: No se pudo descifrar el mensaje]';
-                    }
+            console.log('📨 Mensaje recibido:', { roomPin: message.roomPin, hasEncrypted: !!message.encryptedMessage });
+            
+            // Decrypt message if it's encrypted (has valid encrypted data)
+            if (message.encryptedMessage && message.encryptedMessage.ciphertext && message.encryptedMessage.nonce) {
+                try {
+                    // Usar message.roomPin directamente en lugar de currentRoom
+                    const decrypted = await cryptoService.decryptMessage(
+                        message.encryptedMessage,
+                        message.roomPin
+                    );
+                    message.message = decrypted;
+                    console.log('🔓 Mensaje descifrado en tiempo real para sala:', message.roomPin);
+                } catch (error) {
+                    console.error('❌ Error descifrando mensaje en sala', message.roomPin, ':', error);
+                    message.message = '[Error: No se pudo descifrar el mensaje]';
                 }
-                // Si no tiene encryptedMessage, usar el mensaje en texto plano (legacy)
-                
-                setMessages((prev) => [...prev, message]);
-                if (message.username !== username) {
-                    sendNotification(message);
-                }
+            }
+            // Si no tiene encryptedMessage, usar el mensaje en texto plano (legacy)
+            
+            // Agregar mensaje a la lista (el componente MessageList filtrará por sala actual)
+            setMessages((prev) => [...prev, message]);
+            if (message.username !== username) {
+                sendNotification(message);
             }
         });
 
@@ -487,10 +492,12 @@ const ChatBox = ({ initialRoomPin }) => {
                     />
                     
                     <MessageList 
-                        messages={messages.map(msg => ({
-                            ...msg,
-                            replyTo: msg.replyTo ? messages.find(m => m._id === msg.replyTo._id) : null
-                        }))} 
+                        messages={messages
+                            .filter(msg => msg.roomPin === currentRoom)
+                            .map(msg => ({
+                                ...msg,
+                                replyTo: msg.replyTo ? messages.find(m => m._id === msg.replyTo._id) : null
+                            }))} 
                         onReply={handleReply} 
                         username={username} 
                     />
