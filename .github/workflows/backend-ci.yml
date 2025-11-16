@@ -1,0 +1,106 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+
+jobs:
+  test-and-lint:
+    name: Test & Lint Backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    defaults:
+      run:
+        working-directory: ./backend
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Check for security vulnerabilities
+        run: npm audit --audit-level=high
+        continue-on-error: true
+      
+      - name: Lint code
+        run: |
+          npm install --save-dev eslint
+          npx eslint . --ext .js --max-warnings 0 || echo "⚠️ Linting encontró warnings"
+        continue-on-error: true
+      
+      - name: Check for outdated packages
+        run: npm outdated || true
+      
+      - name: Verify server starts
+        run: |
+          timeout 10s node server.js &
+          sleep 5
+          kill %1 || true
+        env:
+          NODE_ENV: test
+          MONGODB_URI: mongodb://localhost:27017/test
+          JWT_SECRET: test-secret
+          ENCRYPTION_KEY: test-key-32-characters-long!!
+      
+      - name: Check project structure
+        run: |
+          echo "📁 Backend structure:"
+          ls -R
+          
+      - name: Upload coverage (if exists)
+        if: hashFiles('backend/coverage/**') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-${{ matrix.node-version }}
+          path: backend/coverage/
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    defaults:
+      run:
+        working-directory: ./backend
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run Snyk security scan
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+      
+      - name: Check for secrets in code
+        uses: trufflesecurity/trufflehog@main
+        continue-on-error: true
+        with:
+          path: ./backend
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD

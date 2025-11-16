@@ -1,0 +1,89 @@
+name: Health Monitor
+
+on:
+  schedule:
+    # Monitorear salud cada hora
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  monitor-backend:
+    name: Monitor Backend Health
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: Check Backend Health
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://chatentiemporealv2.onrender.com' }}
+        run: |
+          echo "🏥 Checking backend health..."
+          
+          RESPONSE=$(curl -s -w "\n%{http_code}\n%{time_total}" \
+            -H "User-Agent: GitHub-Actions-Health-Monitor" \
+            ${BACKEND_URL}/health)
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n2 | head -n1)
+          TIME_TOTAL=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-2)
+          
+          echo "Status Code: $HTTP_CODE"
+          echo "Response Time: ${TIME_TOTAL}s"
+          echo "Body: $BODY"
+          
+          # Validar status code
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Backend unhealthy - Status: $HTTP_CODE"
+            exit 1
+          fi
+          
+          # Validar tiempo de respuesta
+          if (( $(echo "$TIME_TOTAL > 5.0" | bc -l) )); then
+            echo "⚠️ Slow response time: ${TIME_TOTAL}s"
+          fi
+          
+          # Validar contenido JSON
+          STATUS=$(echo $BODY | jq -r '.status')
+          if [ "$STATUS" != "healthy" ]; then
+            echo "❌ Backend reports unhealthy status"
+            exit 1
+          fi
+          
+          echo "✅ Backend is healthy"
+      
+      - name: Check MongoDB Connection
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://chatentiemporealv2.onrender.com' }}
+        run: |
+          echo "🗄️ Checking MongoDB connection..."
+          
+          HEALTH=$(curl -s ${BACKEND_URL}/health)
+          DB_STATUS=$(echo $HEALTH | jq -r '.database // "unknown"')
+          
+          echo "Database Status: $DB_STATUS"
+          
+          if [ "$DB_STATUS" = "connected" ]; then
+            echo "✅ MongoDB connected"
+          else
+            echo "⚠️ MongoDB status: $DB_STATUS"
+          fi
+      
+      - name: Check Socket.IO
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://chatentiemporealv2.onrender.com' }}
+        run: |
+          echo "🔌 Checking Socket.IO..."
+          
+          # Verificar que el endpoint de Socket.IO responde
+          SOCKET_RESPONSE=$(curl -s -w "%{http_code}" \
+            ${BACKEND_URL}/socket.io/?EIO=4&transport=polling)
+          
+          if [[ "$SOCKET_RESPONSE" =~ "200" ]] || [[ "$SOCKET_RESPONSE" =~ "101" ]]; then
+            echo "✅ Socket.IO endpoint responding"
+          else
+            echo "⚠️ Socket.IO may have issues"
+          fi
+      
+      - name: Log metrics
+        run: |
+          echo "📊 Health check completed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"

@@ -1,0 +1,65 @@
+name: Dependency Review
+
+on:
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Revisar dependencias todos los lunes a las 9 AM
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dependency-review:
+    name: Review Dependencies
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Dependency Review (Backend)
+        uses: actions/dependency-review-action@v4
+        continue-on-error: true
+        with:
+          base-ref: ${{ github.event.pull_request.base.sha || 'main' }}
+          head-ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          config-file: ./.github/dependency-review-config.yml
+          fail-on-severity: high
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+      
+      - name: Check Backend Dependencies
+        run: |
+          cd backend
+          echo "📦 Backend dependencies:"
+          npm outdated || true
+          echo ""
+          echo "🔒 Backend vulnerabilities:"
+          npm audit --json > audit-backend.json || true
+          cat audit-backend.json
+      
+      - name: Check Frontend Dependencies
+        run: |
+          cd frontend
+          echo "📦 Frontend dependencies:"
+          npm outdated || true
+          echo ""
+          echo "🔒 Frontend vulnerabilities:"
+          npm audit --json > audit-frontend.json || true
+          cat audit-frontend.json
+      
+      - name: Upload audit reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audits
+          path: |
+            backend/audit-backend.json
+            frontend/audit-frontend.json
+          retention-days: 30
