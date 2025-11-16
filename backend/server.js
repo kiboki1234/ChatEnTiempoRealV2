@@ -158,13 +158,46 @@ mongoose.connect(process.env.MONGO_URI)
 process.on('SIGTERM', async () => {
     logger.info('SIGTERM received, shutting down gracefully');
     
-    server.close(() => {
-        logger.info('HTTP server closed');
-        mongoose.connection.close(false, () => {
-            logger.info('MongoDB connection closed');
-            process.exit(0);
+    try {
+        // Close HTTP server
+        await new Promise((resolve) => {
+            server.close(() => {
+                logger.info('HTTP server closed');
+                resolve();
+            });
         });
-    });
+        
+        // Close MongoDB connection (no callback in Mongoose 8+)
+        await mongoose.connection.close();
+        logger.info('MongoDB connection closed');
+        
+        process.exit(0);
+    } catch (error) {
+        logger.error('Error during graceful shutdown', { error: error.message });
+        process.exit(1);
+    }
+});
+
+// Handle SIGINT (Ctrl+C) as well
+process.on('SIGINT', async () => {
+    logger.info('SIGINT received, shutting down gracefully');
+    
+    try {
+        await new Promise((resolve) => {
+            server.close(() => {
+                logger.info('HTTP server closed');
+                resolve();
+            });
+        });
+        
+        await mongoose.connection.close();
+        logger.info('MongoDB connection closed');
+        
+        process.exit(0);
+    } catch (error) {
+        logger.error('Error during graceful shutdown', { error: error.message });
+        process.exit(1);
+    }
 });
 
 // Inicializar Socket.IO

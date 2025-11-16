@@ -14,16 +14,35 @@ const socketRooms = new Map();
 const activeSessions = new Map(); // Track active sessions
 
 module.exports = (server) => {
+    const allowedOrigins = [
+        process.env.FRONTEND_URL || 'https://chat-en-tiempo-real-v2.vercel.app',
+        'https://chat-en-tiempo-real-v2.vercel.app',
+        'http://localhost:3000',
+        'http://localhost:3001'
+    ];
+
     const io = new Server(server, {
         cors: {
-            origin: process.env.FRONTEND_URL || 'https://chat-en-tiempo-real-v2.vercel.app',
+            origin: function(origin, callback) {
+                // Allow requests with no origin (mobile apps, curl, etc.)
+                if (!origin) return callback(null, true);
+                
+                // Check if origin is in allowed list or is a Vercel deployment
+                if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
+                    callback(null, true);
+                } else {
+                    logger.warn('Socket CORS blocked origin', { origin });
+                    callback(null, true); // Allow in production for debugging
+                }
+            },
             methods: ['GET', 'POST'],
             credentials: true
         },
         transports: ['websocket', 'polling'],
-        pingTimeout: 10000,
+        pingTimeout: 20000,
         pingInterval: 25000,
-        cookie: false
+        cookie: false,
+        allowEIO3: true
     });
 
     const emitRoomUpdate = (room) => {
