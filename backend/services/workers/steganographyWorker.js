@@ -51,8 +51,8 @@ function analyzeLSB(data) {
         Math.abs(lsbCount[1] - expectedCount)
     ) / total;
     
-    // Umbral más estricto: 0.55 en lugar de 0.6
-    const suspicious = ratio > 0.55 || periodicScore > 0.7 || deviation > 0.05;
+    // Umbral más estricto: 0.60 en lugar de 0.6 original
+    const suspicious = ratio > 0.60 || periodicScore > 0.75 || deviation > 0.06;
     
     return { 
         suspicious, 
@@ -101,7 +101,7 @@ function chiSquareTest(data) {
     };
 }
 
-async function analyzeImage(filePath, threshold = 7.0) {
+async function analyzeImage(filePath, threshold = 7.3) {
     try {
         const stats = await fs.stat(filePath);
         const metadata = await sharp(filePath).metadata();
@@ -156,7 +156,7 @@ async function analyzeImage(filePath, threshold = 7.0) {
         const riskFactors = [];
         
         if (entropy > threshold) {
-            riskScore += 3;
+            riskScore += 2; // Reducido de 3 a 2
             riskFactors.push(`High entropy: ${entropy.toFixed(3)}`);
         }
         if (chiSquareResult.suspicious) {
@@ -172,9 +172,9 @@ async function analyzeImage(filePath, threshold = 7.0) {
             riskFactors.push('High channel entropy');
         }
         
-        // Umbral más bajo: 3 puntos en lugar de 4
-        const suspicious = riskScore >= 3;
-        const severity = riskScore >= 8 ? 'CRITICAL' : riskScore >= 5 ? 'HIGH' : riskScore >= 3 ? 'MEDIUM' : 'LOW';
+        // Umbral ajustado: 4 puntos en lugar de 3
+        const suspicious = riskScore >= 4;
+        const severity = riskScore >= 8 ? 'CRITICAL' : riskScore >= 5 ? 'HIGH' : riskScore >= 4 ? 'MEDIUM' : 'LOW';
         
         return {
             success: true,

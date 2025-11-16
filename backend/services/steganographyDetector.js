@@ -7,10 +7,10 @@ const logger = require('../utils/logger');
 
 class SteganographyDetector {
     constructor() {
-        this.ENTROPY_THRESHOLD = 7.5; // High entropy suggests possible steganography
+        this.ENTROPY_THRESHOLD = 7.3; // Aumentado para reducir falsos positivos en PNG comprimidos
         this.MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
         this.CHI_SQUARE_THRESHOLD = 30; // Más estricto (antes 50)
-        this.LSB_RATIO_THRESHOLD = 0.55; // Más estricto (antes 0.6)
+        this.LSB_RATIO_THRESHOLD = 0.60; // Ajustado para reducir falsos positivos
         
         // Firmas de herramientas de esteganografía expandidas
         this.SUSPICIOUS_PATTERNS = [
@@ -385,7 +385,7 @@ class SteganographyDetector {
             
             if (entropy > this.ENTROPY_THRESHOLD) {
                 riskFactors.push(`High entropy detected: ${entropy.toFixed(3)}`);
-                riskScore += 3;
+                riskScore += 2; // Reducido de 3 a 2 - entropía sola no es suficiente
             }
             if (chiSquareResult.suspicious) {
                 riskFactors.push(`Chi-square test failed: ${chiSquareResult.confidence}`);
@@ -393,7 +393,7 @@ class SteganographyDetector {
             }
             if (lsbAnalysis.suspicious) {
                 riskFactors.push(`LSB anomalies: ${lsbAnalysis.reason}`);
-                riskScore += lsbAnalysis.periodicScore > 0.7 ? 4 : 2;
+                riskScore += lsbAnalysis.periodicScore > 0.75 ? 4 : 2;
             }
             if (metadataAnalysis.suspicious) {
                 riskFactors.push(`Suspicious metadata: ${metadataAnalysis.findings.join(', ')}`);
@@ -425,9 +425,9 @@ class SteganographyDetector {
                 riskScore += trailing.severity === 'HIGH' ? 3 : 2;
             }
             
-            // Umbral más estricto: 3 puntos en lugar de 4
-            const suspicious = riskScore >= 3;
-            const severity = riskScore >= 8 ? 'CRITICAL' : riskScore >= 5 ? 'HIGH' : riskScore >= 3 ? 'MEDIUM' : 'LOW';
+            // Umbral ajustado: 4 puntos (antes 3) - requiere más evidencia
+            const suspicious = riskScore >= 4;
+            const severity = riskScore >= 8 ? 'CRITICAL' : riskScore >= 5 ? 'HIGH' : riskScore >= 4 ? 'MEDIUM' : 'LOW';
             
             return {
                 suspicious,

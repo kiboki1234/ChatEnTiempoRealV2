@@ -310,8 +310,8 @@ router.post('/upload', (req, res, next) => {
                 analysis.severity = 'LOW';
             }
             
-            // Update suspicious flag based on risk score - UMBRAL REDUCIDO A 3
-            if (analysis.riskScore >= 3) {
+            // Update suspicious flag based on risk score - UMBRAL AJUSTADO A 4
+            if (analysis.riskScore >= 4) {
                 analysis.suspicious = true;
             } else {
                 analysis.suspicious = false;
@@ -344,7 +344,11 @@ router.post('/upload', (req, res, next) => {
             logger.warn('File rejected due to security concerns', { 
                 filename: req.file.originalname, 
                 riskScore: analysis.riskScore,
-                severity: analysis.severity
+                severity: analysis.severity,
+                riskFactors: analysis.riskFactors,
+                entropy: analysis.entropy,
+                lsbAnalysis: analysis.lsbAnalysis,
+                chiSquare: analysis.chiSquareResult
             });
             
             // Quarantine the file
