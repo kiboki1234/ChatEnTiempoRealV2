@@ -194,8 +194,8 @@ class SteganographyDetector {
             normalizedChiSquare: normalizedChiSquare.toFixed(4),
             degreesOfFreedom,
             criticalValue,
-            suspicious: normalizedChiSquare > 0.3, // Umbral más estricto normalizado
-            severity: normalizedChiSquare > 0.5 ? 'HIGH' : normalizedChiSquare > 0.3 ? 'MEDIUM' : 'LOW',
+            suspicious: normalizedChiSquare > 3.0, // Ajustado: 3.0 es el umbral correcto
+            severity: normalizedChiSquare > 5.0 ? 'HIGH' : normalizedChiSquare > 3.0 ? 'MEDIUM' : 'LOW',
             confidence: normalizedChiSquare > 0.5 ? 'High confidence LSB steganography detected' :
                        normalizedChiSquare > 0.3 ? 'Moderate confidence of LSB manipulation' :
                        'No significant LSB manipulation detected'

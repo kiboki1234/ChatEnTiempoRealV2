@@ -91,13 +91,13 @@ function chiSquareTest(data) {
     }
     
     const normalizedChiSquare = validPairs > 0 ? chiSquare / validPairs : 0;
-    const suspicious = normalizedChiSquare > 0.3; // Umbral más estricto
+    const suspicious = normalizedChiSquare > 3.0; // Ajustado: 3.0 es el umbral correcto
     
     return {
         chiSquare: chiSquare.toFixed(2),
         normalizedChiSquare: normalizedChiSquare.toFixed(4),
         suspicious,
-        severity: normalizedChiSquare > 0.5 ? 'HIGH' : normalizedChiSquare > 0.3 ? 'MEDIUM' : 'LOW'
+        severity: normalizedChiSquare > 5.0 ? 'HIGH' : normalizedChiSquare > 3.0 ? 'MEDIUM' : 'LOW'
     };
 }
 
