@@ -141,8 +141,11 @@ const ChatBox = ({ initialRoomPin }) => {
         }
     }, []);
 
+    // useEffect para registrar listeners de socket (solo una vez cuando username está disponible)
     useEffect(() => {
         if (!username) return; // Skip if username is not set yet
+        
+        console.log('📡 Registrando listeners de socket para:', username);
         
         // Registrar listeners de socket SIEMPRE (antes de cualquier return)
         // Escuchar eventos de sala
@@ -320,18 +323,8 @@ const ChatBox = ({ initialRoomPin }) => {
             }
         });
 
-        // Después de registrar todos los listeners, decidir si unirse a una sala
-        // NO unirse automáticamente a general si hay un initialRoomPin pendiente
-        if (initialRoomPin) {
-            console.log('⏳ Listeners registrados. Esperando a que otro useEffect una a sala con PIN:', initialRoomPin);
-            // No hacer nada aquí, el otro useEffect se encargará del join
-        } else if (currentRoom === 'general') {
-            // Unirse a la sala general por defecto solo si no hay PIN inicial
-            console.log('✅ Uniéndose a sala general por defecto');
-            socket.emit('joinRoom', { pin: 'general', username });
-        }
-
         return () => {
+            console.log('🧹 Limpiando listeners de socket');
             socket.off('roomJoined');
             socket.off('roomLeft');
             socket.off('receiveMessage');
@@ -342,7 +335,22 @@ const ChatBox = ({ initialRoomPin }) => {
             socket.off('replacedByRegisteredUser');
             socket.off('reconnect');
         };
-    }, [currentRoom, username, initialRoomPin]);
+    }, [username]); // Solo depende de username, NO de currentRoom ni initialRoomPin
+
+    // useEffect separado para join inicial a sala general (solo se ejecuta una vez)
+    useEffect(() => {
+        if (!username) return;
+        
+        // NO unirse automáticamente a general si hay un initialRoomPin pendiente
+        if (initialRoomPin) {
+            console.log('⏳ Esperando a unirse a sala específica con PIN:', initialRoomPin);
+            return; // El otro useEffect manejará el join
+        }
+        
+        // Unirse a la sala general por defecto solo si no hay PIN inicial
+        console.log('✅ Uniéndose a sala general por defecto');
+        socket.emit('joinRoom', { pin: 'general', username });
+    }, [username, initialRoomPin]); // Solo se ejecuta cuando username o initialRoomPin cambian
 
     useEffect(() => {
         // Solo intentar unirse si hay PIN y el usuario está autenticado
