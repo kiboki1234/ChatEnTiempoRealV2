@@ -475,8 +475,8 @@ module.exports = (server) => {
                 emitUserActivity('roomChange', username, pin, { fromRoom: previousRoom || 'none' });
 
             } catch (error) {
-                logger.error('Error creating room', { error: error.message, roomName: data.name });
-                socket.emit('roomCreationError', { message: error.message });
+                logger.error('Error joining room', { error: error.message, pin, username });
+                socket.emit('roomJoinError', { message: error.message });
             }
         });
 
