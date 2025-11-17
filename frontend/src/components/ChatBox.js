@@ -299,6 +299,7 @@ const ChatBox = ({ initialRoomPin }) => {
 
         socket.on('sessionError', handleSessionError);
         socket.on('roomError', handleSessionError);
+        socket.on('roomJoinError', handleSessionError);
 
         socket.on('replacedByRegisteredUser', (data) => {
             console.log('⚠️ Sesión de invitado reemplazada por usuario registrado');
@@ -332,6 +333,7 @@ const ChatBox = ({ initialRoomPin }) => {
             socket.off('userLeft');
             socket.off('sessionError');
             socket.off('roomError');
+            socket.off('roomJoinError');
             socket.off('replacedByRegisteredUser');
             socket.off('reconnect');
         };
