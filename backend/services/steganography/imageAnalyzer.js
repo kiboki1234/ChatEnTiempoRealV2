@@ -38,7 +38,8 @@ async function analyzeColorChannels(filePath) {
         
         // Check if any channel has unusually high entropy
         const maxEntropy = Math.max(redEntropy, greenEntropy, blueEntropy);
-        const suspicious = maxEntropy > constants.ENTROPY_THRESHOLD;
+        // NO marcar como suspicious aquí - dejar que riskScorer decida con pesos profesionales
+        const suspicious = false;
         
         return {
             suspicious,
@@ -48,7 +49,7 @@ async function analyzeColorChannels(filePath) {
                 blue: blueEntropy.toFixed(3)
             },
             maxEntropy: maxEntropy.toFixed(3),
-            reason: suspicious ? 'High entropy in color channels' : 'Channel entropy appears normal'
+            reason: 'Channel entropy data collected for risk analysis'
         };
     } catch (error) {
         return {

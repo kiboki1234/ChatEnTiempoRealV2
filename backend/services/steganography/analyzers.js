@@ -67,17 +67,17 @@ function chiSquareTest(data) {
     
     // Determine severity based on normalized chi-square value
     let severity = 'LOW';
-    if (normalizedChiSquare > 5) {
+    if (normalizedChiSquare > 10) {
         severity = 'HIGH';
-    } else if (normalizedChiSquare > 3) {
+    } else if (normalizedChiSquare > 5) {
         severity = 'MEDIUM';
     }
     
     // Determine confidence level
     let confidence = 'No significant LSB manipulation detected';
-    if (normalizedChiSquare > 0.5) {
+    if (normalizedChiSquare > 10) {
         confidence = 'High confidence LSB steganography detected';
-    } else if (normalizedChiSquare > 0.3) {
+    } else if (normalizedChiSquare > 5) {
         confidence = 'Moderate confidence of LSB manipulation';
     }
     
@@ -86,7 +86,7 @@ function chiSquareTest(data) {
         normalizedChiSquare: normalizedChiSquare.toFixed(4),
         degreesOfFreedom: validPairs,
         criticalValue: constants.CHI_SQUARE_THRESHOLD,
-        suspicious: normalizedChiSquare > 3,
+        suspicious: false,
         severity,
         confidence
     };
@@ -135,7 +135,8 @@ function analyzeLSB(data) {
         periodicScore = lsbSequences.length / 10;
     }
     
-    const suspicious = ratio > constants.LSB_RATIO_THRESHOLD || periodicScore > 2;
+    // Solo marcar como suspicious si hay patrones EXTREMADAMENTE periódicos
+    const suspicious = periodicScore > 0.95;
     
     return {
         suspicious,
@@ -145,8 +146,8 @@ function analyzeLSB(data) {
         periodicSequences: lsbSequences.length,
         periodicScore: periodicScore.toFixed(2),
         reason: suspicious 
-            ? `Abnormal LSB distribution detected (ratio: ${ratio.toFixed(3)}, expected: 0.500)`
-            : 'LSB distribution appears normal'
+            ? `EXTREME periodic LSB patterns detected (score: ${periodicScore.toFixed(2)})`
+            : 'LSB distribution within acceptable range'
     };
 }
 
@@ -177,7 +178,8 @@ function analyzeByteFrequency(data) {
     
     // Detect bytes that never appear (suspicious in large images)
     const zeroFreqBytes = frequency.filter(f => f === 0).length;
-    const unusualDistribution = coefficient < 0.3 || zeroFreqBytes > 200;
+    // NO marcar como suspicious - la distribución varía legítimamente
+    const unusualDistribution = false;
     
     return {
         suspicious: unusualDistribution,
@@ -185,9 +187,7 @@ function analyzeByteFrequency(data) {
         stdDev: stdDev.toFixed(2),
         mean: mean.toFixed(2),
         zeroFrequencyBytes: zeroFreqBytes,
-        reason: unusualDistribution 
-            ? 'Unusual byte frequency distribution suggests encryption or random data'
-            : 'Byte frequency distribution appears natural'
+        reason: 'Byte frequency data collected for analysis'
     };
 }
 
@@ -196,30 +196,26 @@ function analyzeByteFrequency(data) {
  */
 function analyzeMetadata(metadata) {
     const findings = [];
+    // NO marcar como suspicious - metadata varía legítimamente en archivos de cámaras profesionales
     let suspicious = false;
     
-    // Check for unusually high density
+    // Solo recopilar información, no marcar como sospechoso
     if (metadata.density > 1000) {
-        findings.push('Unusually high density');
-        suspicious = true;
+        findings.push('High density');
     }
     
-    // Check for excessive EXIF tags
     if (metadata.exif && Object.keys(metadata.exif).length > 50) {
-        findings.push('Too many EXIF tags');
-        suspicious = true;
+        findings.push('Many EXIF tags');
     }
     
-    // Check for large ICC profile
     if (metadata.icc && metadata.icc.length > 100000) {
         findings.push('Large ICC profile');
-        suspicious = true;
     }
     
     return {
         suspicious,
         findings,
-        reason: suspicious ? 'Unusual metadata patterns detected' : 'Metadata appears normal',
+        reason: 'Metadata collected for analysis',
         details: {
             hasExif: !!metadata.exif,
             hasIcc: !!metadata.icc,
