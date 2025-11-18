@@ -22,8 +22,7 @@ describe('User Model', () => {
         it('should create a user successfully', async () => {
             const userData = {
                 username: 'testuser',
-                email: 'test@example.com',
-                password: 'hashedpassword123',
+                password: 'Password123!',
                 role: 'user'
             };
 
@@ -32,7 +31,6 @@ describe('User Model', () => {
 
             expect(savedUser._id).toBeDefined();
             expect(savedUser.username).toBe(userData.username);
-            expect(savedUser.email).toBe(userData.email);
             expect(savedUser.role).toBe('user');
             expect(savedUser.isActive).toBe(true);
         });
@@ -49,22 +47,19 @@ describe('User Model', () => {
 
             expect(error).toBeDefined();
             expect(error.errors.username).toBeDefined();
-            expect(error.errors.email).toBeDefined();
         });
 
         it('should not allow duplicate usernames', async () => {
             const userData = {
                 username: 'testuser',
-                email: 'test1@example.com',
-                password: 'hashedpassword123'
+                password: 'Password123!'
             };
 
             await User.create(userData);
 
             const duplicateUser = new User({
                 username: 'testuser',
-                email: 'test2@example.com',
-                password: 'hashedpassword123'
+                password: 'Password456!'
             });
 
             let error;
@@ -83,8 +78,7 @@ describe('User Model', () => {
         it('should enable 2FA successfully', async () => {
             const user = await User.create({
                 username: 'testuser',
-                email: 'test@example.com',
-                password: 'hashedpassword123'
+                password: 'Password123!'
             });
 
             user.twoFactorSecret = 'test-secret';
@@ -101,16 +95,11 @@ describe('User Model', () => {
         it('should track last login', async () => {
             const user = await User.create({
                 username: 'testuser',
-                email: 'test@example.com',
-                password: 'hashedpassword123'
+                password: 'Password123!'
             });
 
-            const loginDate = new Date();
-            user.lastLogin = loginDate;
-            await user.save();
-
             const updatedUser = await User.findById(user._id);
-            expect(updatedUser.lastLogin).toBeDefined();
+            expect(updatedUser.lastActivity).toBeDefined();
         });
     });
 });

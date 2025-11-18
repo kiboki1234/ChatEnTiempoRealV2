@@ -7,17 +7,17 @@ describe('Encryption Service', () => {
             const key = encryptionService.generateRoomKey(roomPin);
 
             expect(key).toBeDefined();
-            expect(Buffer.isBuffer(key)).toBe(true);
+            expect(typeof key).toBe('string');
             expect(key.length).toBeGreaterThan(0);
         });
 
         it('should retrieve existing room key', () => {
-            const roomPin = '123456';
-            const key1 = encryptionService.generateRoomKey(roomPin);
-            const key2 = encryptionService.getRoomKey(roomPin);
+            const roomPin = '123457';
+            const keyHex = encryptionService.generateRoomKey(roomPin);
+            const keyBuffer = encryptionService.getRoomKey(roomPin);
 
-            expect(key2).toBeDefined();
-            expect(key1.equals(key2)).toBe(true);
+            expect(keyBuffer).toBeDefined();
+            expect(Buffer.from(keyHex, 'hex').equals(keyBuffer)).toBe(true);
         });
 
         it('should return undefined for non-existent room key', () => {
@@ -26,7 +26,7 @@ describe('Encryption Service', () => {
         });
 
         it('should clear room key', () => {
-            const roomPin = '123456';
+            const roomPin = '123458';
             encryptionService.generateRoomKey(roomPin);
             
             encryptionService.clearRoomKey(roomPin);
@@ -39,50 +39,55 @@ describe('Encryption Service', () => {
     describe('Message Encryption/Decryption', () => {
         it('should encrypt and decrypt message successfully', () => {
             const message = 'Hello, World!';
-            const roomPin = '123456';
-            const key = encryptionService.generateRoomKey(roomPin);
+            const roomPin = '123459';
+            
+            // generateRoomKey now returns hex string, but internal map stores Buffer
+            encryptionService.generateRoomKey(roomPin);
 
-            const encrypted = encryptionService.encryptMessage(message, key);
+            const encrypted = encryptionService.encryptMessage(message, roomPin);
             expect(encrypted).toBeDefined();
-            expect(encrypted).not.toBe(message);
+            expect(encrypted.encrypted).not.toBe(message);
 
-            const decrypted = encryptionService.decryptMessage(encrypted, key);
+            const decrypted = encryptionService.decryptMessage(encrypted, roomPin);
             expect(decrypted).toBe(message);
         });
 
         it('should handle empty message', () => {
             const message = '';
-            const roomPin = '123456';
-            const key = encryptionService.generateRoomKey(roomPin);
+            const roomPin = '123460';
+            
+            encryptionService.generateRoomKey(roomPin);
 
-            const encrypted = encryptionService.encryptMessage(message, key);
-            const decrypted = encryptionService.decryptMessage(encrypted, key);
+            const encrypted = encryptionService.encryptMessage(message, roomPin);
+            const decrypted = encryptionService.decryptMessage(encrypted, roomPin);
 
             expect(decrypted).toBe(message);
         });
 
         it('should handle unicode characters', () => {
             const message = '¡Hola! 你好 🎉';
-            const roomPin = '123456';
-            const key = encryptionService.generateRoomKey(roomPin);
+            const roomPin = '123461';
+            
+            encryptionService.generateRoomKey(roomPin);
 
-            const encrypted = encryptionService.encryptMessage(message, key);
-            const decrypted = encryptionService.decryptMessage(encrypted, key);
+            const encrypted = encryptionService.encryptMessage(message, roomPin);
+            const decrypted = encryptionService.decryptMessage(encrypted, roomPin);
 
             expect(decrypted).toBe(message);
         });
 
         it('should fail with wrong key', () => {
             const message = 'Secret message';
-            const roomPin1 = '123456';
-            const roomPin2 = '654321';
-            const key1 = encryptionService.generateRoomKey(roomPin1);
-            const key2 = encryptionService.generateRoomKey(roomPin2);
+            const roomPin1 = '123462';
+            const roomPin2 = '654322';
+            
+            encryptionService.generateRoomKey(roomPin1);
+            encryptionService.generateRoomKey(roomPin2);
 
-            const encrypted = encryptionService.encryptMessage(message, key1);
+            const encrypted = encryptionService.encryptMessage(message, roomPin1);
 
             expect(() => {
-                encryptionService.decryptMessage(encrypted, key2);
+                encryptionService.decryptMessage(encrypted, roomPin2);
             }).toThrow();
         });
     });
