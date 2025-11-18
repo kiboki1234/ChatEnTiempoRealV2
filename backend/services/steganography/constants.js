@@ -4,14 +4,15 @@
  */
 
 module.exports = {
-    // Detection Thresholds
-    ENTROPY_THRESHOLD: 7.85, // Shannon entropy threshold (adjusted for compressed PNG/JPEG - normal range 7.6-7.8)
+    // Detection Thresholds - MODO PROFESIONAL
+    // Solo detectar cuando hay EVIDENCIA CONCRETA, no estadísticas genéricas
+    ENTROPY_THRESHOLD: 7.999, // Casi perfecto (8.0) - solo archivos 100% random/cifrados
     MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
-    CHI_SQUARE_THRESHOLD: 50, // Chi-square critical value (increased to reduce false positives)
-    LSB_RATIO_THRESHOLD: 0.7, // LSB distribution ratio threshold (more permissive)
-    LSB_PERIODIC_THRESHOLD: 0.85, // LSB periodic pattern threshold (more strict)
-    LSB_DEVIATION_THRESHOLD: 0.08, // LSB deviation threshold (more permissive)
-    RISK_SCORE_THRESHOLD: 7, // Minimum risk score to reject file (increased from 4)
+    CHI_SQUARE_THRESHOLD: 100, // Solo patrones MUY anormales (normalizado > 5)
+    LSB_RATIO_THRESHOLD: 0.95, // Solo desviaciones EXTREMAS (normal es ~0.5)
+    LSB_PERIODIC_THRESHOLD: 0.95, // Solo patrones MUY periódicos
+    LSB_DEVIATION_THRESHOLD: 0.3, // Solo desviaciones mayores
+    RISK_SCORE_THRESHOLD: 15, // Requiere MÚLTIPLES indicadores fuertes (no solo estadística)
     
     // Steganography Tool Signatures
     SUSPICIOUS_PATTERNS: [
@@ -98,20 +99,22 @@ module.exports = {
         { name: 'RAR', sig: [0x52, 0x61, 0x72, 0x21] }
     ],
     
-    // Risk Scoring Weights (adjusted for fewer false positives)
+    // Risk Scoring Weights - MODO PROFESIONAL
+    // Solo confiar en EVIDENCIA CONCRETA (firmas, patrones específicos)
+    // NO confiar en estadísticas genéricas (entropía, chi-square solos)
     RISK_WEIGHTS: {
-        HIGH_ENTROPY: 1,          // Reduced from 2 - high entropy is normal in compressed files
-        CHI_SQUARE_HIGH: 3,       // Reduced from 4 - less weight on statistical tests
-        CHI_SQUARE_MEDIUM: 2,     // Reduced from 3
-        LSB_PERIODIC: 5,          // Increased from 4 - strong indicator
-        LSB_ABNORMAL: 1,          // Reduced from 2 - minor anomaly
-        METADATA_SUSPICIOUS: 1,   // Reduced from 2 - metadata can vary
-        CHANNEL_ENTROPY: 1,       // Reduced from 2 - normal in photos
-        STRUCTURE_ANOMALY: 2,     // Reduced from 3 - some files have non-standard structure
-        STEGO_SIGNATURE: 6,       // Increased from 4 - strong indicator of actual stego tools
-        HIDDEN_TEXT: 2,           // Reduced from 3 - base64/hex common in metadata
-        BYTE_FREQUENCY: 1,        // Reduced from 2 - varies by compression
-        TRAILING_DATA_HIGH: 4,    // Increased from 3 - strong indicator
-        TRAILING_DATA_MEDIUM: 2   // Same - moderate indicator
+        HIGH_ENTROPY: 0,          // NO es indicador - archivos comprimidos tienen alta entropía
+        CHI_SQUARE_HIGH: 0,       // NO es indicador confiable solo
+        CHI_SQUARE_MEDIUM: 0,     // NO es indicador confiable solo
+        LSB_PERIODIC: 10,         // Patrones periódicos EXTREMOS en LSB (muy específico)
+        LSB_ABNORMAL: 0,          // NO es indicador confiable solo
+        METADATA_SUSPICIOUS: 0,   // NO es indicador - muchos archivos legítimos
+        CHANNEL_ENTROPY: 0,       // NO es indicador confiable
+        STRUCTURE_ANOMALY: 6,     // Solo anomalías estructurales MUY específicas
+        STEGO_SIGNATURE: 20,      // PRUEBA DEFINITIVA - firma de herramienta conocida
+        HIDDEN_TEXT: 0,           // NO es indicador - base64/hex común en metadata
+        BYTE_FREQUENCY: 0,        // NO es indicador confiable
+        TRAILING_DATA_HIGH: 10,   // Datos significativos al final (muy sospechoso)
+        TRAILING_DATA_MEDIUM: 5   // Algo de trailing data
     }
 };
