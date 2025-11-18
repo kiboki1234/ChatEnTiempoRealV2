@@ -5,13 +5,13 @@
 
 module.exports = {
     // Detection Thresholds
-    ENTROPY_THRESHOLD: 7.3, // Shannon entropy threshold (adjusted for compressed PNG)
+    ENTROPY_THRESHOLD: 7.85, // Shannon entropy threshold (adjusted for compressed PNG/JPEG - normal range 7.6-7.8)
     MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
-    CHI_SQUARE_THRESHOLD: 30, // Chi-square critical value
-    LSB_RATIO_THRESHOLD: 0.6, // LSB distribution ratio threshold
-    LSB_PERIODIC_THRESHOLD: 0.75, // LSB periodic pattern threshold
-    LSB_DEVIATION_THRESHOLD: 0.06, // LSB deviation threshold
-    RISK_SCORE_THRESHOLD: 4, // Minimum risk score to reject file
+    CHI_SQUARE_THRESHOLD: 50, // Chi-square critical value (increased to reduce false positives)
+    LSB_RATIO_THRESHOLD: 0.7, // LSB distribution ratio threshold (more permissive)
+    LSB_PERIODIC_THRESHOLD: 0.85, // LSB periodic pattern threshold (more strict)
+    LSB_DEVIATION_THRESHOLD: 0.08, // LSB deviation threshold (more permissive)
+    RISK_SCORE_THRESHOLD: 7, // Minimum risk score to reject file (increased from 4)
     
     // Steganography Tool Signatures
     SUSPICIOUS_PATTERNS: [
@@ -98,20 +98,20 @@ module.exports = {
         { name: 'RAR', sig: [0x52, 0x61, 0x72, 0x21] }
     ],
     
-    // Risk Scoring Weights
+    // Risk Scoring Weights (adjusted for fewer false positives)
     RISK_WEIGHTS: {
-        HIGH_ENTROPY: 2,
-        CHI_SQUARE_HIGH: 4,
-        CHI_SQUARE_MEDIUM: 3,
-        LSB_PERIODIC: 4,
-        LSB_ABNORMAL: 2,
-        METADATA_SUSPICIOUS: 2,
-        CHANNEL_ENTROPY: 2,
-        STRUCTURE_ANOMALY: 3,
-        STEGO_SIGNATURE: 4,
-        HIDDEN_TEXT: 3,
-        BYTE_FREQUENCY: 2,
-        TRAILING_DATA_HIGH: 3,
-        TRAILING_DATA_MEDIUM: 2
+        HIGH_ENTROPY: 1,          // Reduced from 2 - high entropy is normal in compressed files
+        CHI_SQUARE_HIGH: 3,       // Reduced from 4 - less weight on statistical tests
+        CHI_SQUARE_MEDIUM: 2,     // Reduced from 3
+        LSB_PERIODIC: 5,          // Increased from 4 - strong indicator
+        LSB_ABNORMAL: 1,          // Reduced from 2 - minor anomaly
+        METADATA_SUSPICIOUS: 1,   // Reduced from 2 - metadata can vary
+        CHANNEL_ENTROPY: 1,       // Reduced from 2 - normal in photos
+        STRUCTURE_ANOMALY: 2,     // Reduced from 3 - some files have non-standard structure
+        STEGO_SIGNATURE: 6,       // Increased from 4 - strong indicator of actual stego tools
+        HIDDEN_TEXT: 2,           // Reduced from 3 - base64/hex common in metadata
+        BYTE_FREQUENCY: 1,        // Reduced from 2 - varies by compression
+        TRAILING_DATA_HIGH: 4,    // Increased from 3 - strong indicator
+        TRAILING_DATA_MEDIUM: 2   // Same - moderate indicator
     }
 };

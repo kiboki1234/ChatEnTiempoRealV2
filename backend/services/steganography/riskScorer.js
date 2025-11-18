@@ -108,10 +108,10 @@ function evaluateDataRisks(channelAnalysis, frequencyAnalysis, trailingDataFindi
  * Determine severity level from risk score
  */
 function determineSeverity(riskScore) {
-    if (riskScore >= 8) return 'CRITICAL';
-    if (riskScore >= 5) return 'HIGH';
-    if (riskScore >= 4) return 'MEDIUM';
-    return 'LOW';
+    if (riskScore >= 10) return 'CRITICAL';  // Very strong indicators
+    if (riskScore >= 7) return 'HIGH';       // Multiple indicators
+    if (riskScore >= 5) return 'MEDIUM';     // Some indicators
+    return 'LOW';                             // Minor anomalies
 }
 
 /**
@@ -202,12 +202,12 @@ function calculateRiskScore(analysisResults) {
             : constants.RISK_WEIGHTS.TRAILING_DATA_MEDIUM;
     }
     
-    // Determine overall severity
+    // Determine overall severity (aligned with new thresholds)
     const suspicious = riskScore >= constants.RISK_SCORE_THRESHOLD;
-    const severity = riskScore >= 8 ? 'CRITICAL' 
-                   : riskScore >= 5 ? 'HIGH' 
-                   : riskScore >= 4 ? 'MEDIUM' 
-                   : 'LOW';
+    const severity = riskScore >= 10 ? 'CRITICAL'  // Very strong indicators
+                   : riskScore >= 7 ? 'HIGH'        // Multiple indicators (threshold)
+                   : riskScore >= 5 ? 'MEDIUM'      // Some indicators
+                   : 'LOW';                         // Minor anomalies
     
     return {
         suspicious,
@@ -229,15 +229,19 @@ function generateRecommendation(analysisResult) {
         return 'CRITICAL: File contains malicious content and must be rejected immediately.';
     }
     
+    if (analysisResult.riskScore >= 10) {
+        return 'CRITICAL RISK: File shows strong indicators of steganography or manipulation. Must be rejected.';
+    }
+    
     if (analysisResult.riskScore >= 7) {
-        return 'HIGH RISK: File shows multiple indicators of steganography or manipulation. Strongly recommend rejection.';
+        return 'HIGH RISK: File shows multiple suspicious patterns. Strongly recommend rejection.';
     }
     
-    if (analysisResult.riskScore >= 4) {
-        return 'MODERATE RISK: File shows suspicious patterns. Recommend manual review or rejection.';
+    if (analysisResult.riskScore >= 5) {
+        return 'MODERATE RISK: File shows some anomalies. May be acceptable with caution.';
     }
     
-    return 'File shows minor anomalies but may be acceptable with caution.';
+    return 'File shows minor anomalies but is generally safe.';
 }
 
 module.exports = {
