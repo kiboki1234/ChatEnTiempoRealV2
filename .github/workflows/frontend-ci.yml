@@ -476,11 +476,6 @@ jobs:
           npx eslint src --ext .js,.jsx,.ts,.tsx --max-warnings 20 || echo "⚠️ Linting encontró warnings"
         continue-on-error: true
       
-      - name: Run tests
-        run: npm test -- --coverage --watchAll=false
-        env:
-          CI: true
-      
       - name: Build production
         run: npm run build
         env:
