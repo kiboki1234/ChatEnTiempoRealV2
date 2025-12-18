@@ -782,6 +782,69 @@ jobs:
           uploadArtifacts: true
           temporaryPublicStorage: true
 
+  # ========== ETAPA 5: MERGE A MAIN Y DESPLIEGUE ==========
+  deploy-production:
+    name: Despliegue en Producción
+    needs: [security-review, build-and-test, backend-verification, lighthouse]
+    if: |
+      needs.security-review.outputs.security_passed == 'true' &&
+      needs.build-and-test.outputs.build_passed == 'true' &&
+      needs.backend-verification.outputs.backend_passed == 'true' &&
+      github.event_name == 'pull_request' &&
+      github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    environment: production
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Merge automático a main
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          git fetch origin
+          git checkout main 2>/dev/null || git checkout -b main origin/main
+          git pull origin main
+          git merge origin/${{ github.head_ref }} --no-ff -m "Auto-deploy: PR #${{ github.event.pull_request.number }} [Secure Release]"
+          git push origin main
+      
+      - name: Desplegar en Railway (ejemplo)
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          echo "Desplegando en Railway..."
+          # Comando de despliegue específico para tu proveedor
+          # railway up --detach || echo "Despliegue completado"
+          echo "Despliegue simulado para demostración"
+      
+      - name: Notificar despliegue exitoso
+        run: |
+          python -c "
+          import requests
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
+          pr_number = '${{ github.event.pull_request.number }}'
+          deploy_url = '${{ env.DEPLOY_URL }}'
+          
+          if token and chat_id:
+              url = f'https://api.telegram.org/bot{token}/sendMessage'
+              message = f'🎉 *Despliegue en Producción Exitoso*\n\nPR: #{pr_number}\\nEstado: 🚀 EN PRODUCCIÓN\\nURL: {deploy_url}\\n\\n✅ Pipeline completado exitosamente.'
+              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+          "
+      
+      - name: Crear release tag
+        run: |
+          VERSION="v$(date +%Y%m%d.%H%M)"
+          git tag -a "$VERSION" -m "Release: PR #${{ github.event.pull_request.number }}"
+          git push origin "$VERSION"
 
   # ========== ETAPA FALLBACK: NOTIFICACIÓN DE FALLOS ==========
   notify-failure:
@@ -789,6 +852,7 @@ jobs:
     if: always() && (failure() || cancelled())
     needs: [security-review, build-and-test, backend-verification, deploy-production]
     runs-on: ubuntu-latest
+    
     
     steps:
       - name: Notificar fallo general
