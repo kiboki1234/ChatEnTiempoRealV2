@@ -19,7 +19,8 @@ env:
   DEPLOY_URL: 'https://tu-app.railway.app'
 
 jobs:
-  # ========== ETAPA 1: REVISIÓN DE SEGURIDAD CON MINERÍA DE DATOS ==========
+
+    # ========== ETAPA 1: REVISIÓN DE SEGURIDAD CON MINERÍA DE DATOS ==========
   security-review:
     name: Revisión de Seguridad con ML
     if: github.event_name == 'pull_request' && (github.base_ref == 'test' || github.base_ref == 'main')
@@ -54,7 +55,6 @@ jobs:
             echo "Modelo ML encontrado"
           else
             echo "Modelo no encontrado, usando modelo por defecto"
-            # Puedes agregar aquí la descarga de un modelo pre-entrenado
           fi
       
       - name: Obtener archivos modificados en el PR
@@ -91,7 +91,6 @@ jobs:
         run: |
           echo "Ejecutando análisis de seguridad con modelo de minería de datos..."
           
-          # Crear script de análisis temporal
           cat > security_scanner.py << 'EOF'
           import sys
           import json
@@ -102,7 +101,6 @@ jobs:
           import os
           from pathlib import Path
           
-          # Configurar modelo
           MODEL_PATH = os.getenv('MODEL_PATH', 'models/modelo_seguridad_final.pkl')
           
           class SecurityScannerML:
@@ -110,7 +108,6 @@ jobs:
                   try:
                       self.model = joblib.load(MODEL_PATH)
                   except:
-                      # Modelo básico si no hay disponible
                       self.model = None
                   
                   self.RISK_PATTERNS = {
@@ -131,7 +128,7 @@ jobs:
                       features['avg_complexity'] = analysis.average_cyclomatic_complexity
                       features['max_complexity'] = max([f.cyclomatic_complexity for f in analysis.function_list]) if analysis.function_list else 0
                   except:
-                      features['nloc'] = len(code.split('\\n'))
+                      features['nloc'] = len(code.split('\n'))
                   
                   ext = filename.split('.')[-1].lower()
                   lang = 'py' if ext == 'py' else ('js' if ext in ['js', 'jsx'] else ('ts' if ext in ['ts', 'tsx'] else ('java' if ext == 'java' else None)))
@@ -187,22 +184,19 @@ jobs:
                   
                   return results, vulnerable_count
           
-          # Leer archivos modificados
           files_to_scan = []
           if os.path.exists('changed_files.txt'):
               with open('changed_files.txt', 'r') as f:
                   files_to_scan = [line.strip() for line in f if line.strip()]
           
-          # Si no hay archivos específicos, buscar en el proyecto
           if not files_to_scan:
               for ext in ['*.py', '*.js', '*.jsx', '*.ts', '*.tsx', '*.java']:
                   files_to_scan.extend([str(p) for p in Path('.').rglob(ext)])
           
-          # Filtrar archivos existentes
           files_to_scan = [f for f in files_to_scan if os.path.exists(f)]
           
           scanner = SecurityScannerML()
-          results, vulnerable_count = scanner.analyze_files(files_to_scan[:50])  # Limitar a 50 archivos
+          results, vulnerable_count = scanner.analyze_files(files_to_scan[:50])
           
           summary = {
               'status': 'VULNERABLE' if vulnerable_count > 0 else 'SECURE',
@@ -215,26 +209,34 @@ jobs:
           with open('security_result.json', 'w') as f:
               json.dump(summary, f, indent=2)
           
-          print(f"::set-output name=is_vulnerable::{str(vulnerable_count > 0).lower()}")
-          print(f"::set-output name=status::{summary['status']}")
-          print(f"::set-output name=risk_probability::{summary['risk_probability']:.2f}")
+          # Guardar outputs usando el nuevo formato
+          vulnerable_files = [r['file'] for r in results if r['status'] == 'VULNERABLE']
+          vulnerable_files_str = ','.join(vulnerable_files) if vulnerable_files else ''
           
-          # Mostrar resumen
-          print(f"\\nResumen del análisis de seguridad:")
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+              fh.write(f'is_vulnerable={str(vulnerable_count > 0).lower()}\n')
+              fh.write(f'status={summary["status"]}\n')
+              fh.write(f'risk_probability={summary["risk_probability"]:.2f}\n')
+              fh.write(f'vulnerable_files={vulnerable_files_str}\n')
+          
+          print(f"\nResumen del análisis de seguridad:")
           print(f"   Archivos analizados: {len(results)}")
           print(f"   Archivos vulnerables: {vulnerable_count}")
           print(f"   Estado: {summary['status']}")
           
+          if vulnerable_files:
+              print(f"\nArchivos vulnerables detectados:")
+              for file in vulnerable_files:
+                  print(f"   - {file}")
+          
           sys.exit(1 if vulnerable_count > 0 else 0)
           EOF
           
-          # Guardar lista de archivos modificados
           echo "${{ steps.changed-files.outputs.all_changed_files }}" > changed_files.txt
           
-          # Ejecutar análisis
           python security_scanner.py
       
-            - name: Comentar resultado en el PR
+      - name: Comentar resultado en el PR
         id: comment-pr
         if: always()
         uses: actions/github-script@v7
@@ -251,7 +253,6 @@ jobs:
               totalFiles = result.files_analyzed || 0;
               vulnerabilitiesFound = result.vulnerabilities_found || 0;
               
-              // Filtrar solo los archivos vulnerables
               vulnerableFiles = result.details.filter(file => 
                 file.status === 'VULNERABLE'
               ).map(file => ({
@@ -264,10 +265,9 @@ jobs:
               console.error('Error reading security result:', e);
             }
             
-            const isVulnerable = data.status === 'VULNERABLE';
-            const riskProb = data.risk_probability || 0;
+            const isVulnerable = '${{ steps.security-scan.outputs.is_vulnerable }}' === 'true';
+            const riskProb = parseFloat('${{ steps.security-scan.outputs.risk_probability }}') || 0;
             
-            // Construir lista de archivos vulnerables
             let vulnerableFilesList = '';
             if (vulnerableFiles.length > 0) {
               vulnerableFilesList = '### 📋 Archivos Vulnerables Detectados:\n\n';
@@ -306,7 +306,6 @@ jobs:
               body: comment
             });
 
-            // Agregar label según resultado
             const label = isVulnerable ? 'fixing-required' : 'security-approved';
             github.rest.issues.addLabels({
               issue_number: context.issue.number,
@@ -314,8 +313,9 @@ jobs:
               repo: context.repo.repo,
               labels: [label]
             });
-
+      
       - name: Bloquear PR y crear issue automática
+        id: block-pr
         if: steps.security-scan.outputs.is_vulnerable == 'true'
         run: |
           echo "Código vulnerable detectado. Bloqueando merge y creando issue..."
@@ -332,7 +332,6 @@ jobs:
               print('')
           ")
           
-          # Crear lista formateada para la issue
           FILE_LIST=""
           if [ -n "$VULNERABLE_FILES" ]; then
               IFS=',' read -ra FILES_ARRAY <<< "$VULNERABLE_FILES"
@@ -343,7 +342,6 @@ jobs:
               done
           fi
           
-          # Crear issue automática
           curl -X POST \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
@@ -354,8 +352,9 @@ jobs:
               \"labels\": [\"security\", \"fixing-required\", \"vulnerability\"],
               \"assignees\": [\"${{ github.event.pull_request.user.login }}\"]
             }"
-
+      
       - name: Notificar resultado de seguridad
+        id: notify-security
         if: always()
         run: |
           python -c "
@@ -366,7 +365,6 @@ jobs:
           chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
           pr_number = ${{ github.event.pull_request.number }}
           
-          # Leer datos del archivo JSON
           try:
               with open('security_result.json', 'r') as f:
                   data = json.load(f)
@@ -374,7 +372,6 @@ jobs:
               status = data.get('status', 'UNKNOWN')
               risk_prob = data.get('risk_probability', 0)
               
-              # Obtener archivos vulnerables
               vulnerable_files = []
               for item in data.get('details', []):
                   if item.get('status') == 'VULNERABLE':
@@ -419,7 +416,7 @@ jobs:
       security_passed: ${{ steps.security-scan.outputs.is_vulnerable == 'false' }}
       security_status: ${{ steps.security-scan.outputs.status }}
       vulnerable_files: ${{ steps.security-scan.outputs.vulnerable_files }}
-      
+        
   # ========== ETAPA 2: BUILD Y TEST DEL FRONTEND (SOLO SI SEGURO) ==========
   build-and-test:
     name: Build & Test Frontend
