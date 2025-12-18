@@ -1,10 +1,10 @@
-# 💬 Chat en Tiempo Real V2
+# ChatEnTiempoRealV2
+Proyecto de chat en tiempo real con seguridad integrada y CI/CD.
 
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
-[![React Version](https://img.shields.io/badge/react-19.0.0-blue.svg)](https://reactjs.org/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-70%2B%20passing-success.svg)](TESTING_GUIDE.md)
-[![Coverage](https://img.shields.io/badge/coverage-70%25-yellow.svg)](TESTING_SUMMARY.md)
+## Estado del Proyecto
+- **CI/CD:** Activo (GitHub Actions)
+- **Seguridad:** Escáner ML integrado
+- **Notificaciones:** Telegram (Mejoradas 🚀)
 
 > Aplicación de chat en tiempo real con encriptación end-to-end, autenticación 2FA, salas privadas y mensajes de voz.
 

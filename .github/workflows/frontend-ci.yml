@@ -15,7 +15,7 @@ on:
 env:
   TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
   TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-  MODEL_PATH: './models/modelo_seguridad_final.pkl'
+  MODEL_PATH: './models/modelo_seguridad_final2.pkl'
   DEPLOY_URL: 'https://tu-app.railway.app'
 
 jobs:
@@ -23,7 +23,10 @@ jobs:
     # ========== ETAPA 1: REVISIÓN DE SEGURIDAD CON MINERÍA DE DATOS ==========
   security-review:
     name: Revisión de Seguridad con ML
-    if: github.event_name == 'pull_request' && (github.base_ref == 'test' || github.base_ref == 'main')
+    # Ejecutar en PRs (hacia test/main) O en Pushes (a main/test/develop)
+    if: |
+      (github.event_name == 'pull_request' && (github.base_ref == 'test' || github.base_ref == 'main')) ||
+      (github.event_name == 'push')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -51,7 +54,7 @@ jobs:
       - name: Verificar modelo de ML
         run: |
           echo "Verificando modelo de minería de datos..."
-          if [ -f "models/modelo_seguridad_final.pkl" ]; then
+          if [ -f "models/modelo_seguridad_final2.pkl" ]; then
             echo "Modelo ML encontrado"
           else
             echo "Modelo no encontrado, usando modelo por defecto"
@@ -70,20 +73,42 @@ jobs:
             **/*.java
             **/*.cpp
       
+      - name: Debug Secrets
+        run: |
+          echo "Debug Info:"
+          if [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then echo "Token: PRESENT"; else echo "Token: NOT FOUND"; fi
+          if [ -n "${{ secrets.TELEGRAM_CHAT_ID }}" ]; then echo "ChatID: PRESENT"; else echo "ChatID: NOT FOUND"; fi
+          ls -R models/ || echo "Models directory not found"
+      
       - name: Notificar inicio de revisión de seguridad
         if: always()
         run: |
           python -c "
           import requests
-          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
-          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          pr_number = ${{ github.event.pull_request.number }}
-          author = '${{ github.event.pull_request.user.login }}'
+          import os
+          import sys
           
-          if token and chat_id:
-            url = f'https://api.telegram.org/bot{token}/sendMessage'
-            message = f'🔍 *Inicio de Revisión de Seguridad*\n\nPR: #{pr_number}\nAutor: {author}\nEstado: ⏳ Analizando código...'
-            requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+          token = os.environ.get('TELEGRAM_BOT_TOKEN')
+          chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+          
+          # Handle Push vs PR
+          event_name = '${{ github.event_name }}'
+          if event_name == 'pull_request':
+              ref_info = 'PR: #${{ github.event.pull_request.number }}'
+          else:
+              ref_info = 'Push: ${{ github.ref_name }}'
+          
+          author = '${{ github.actor }}'
+          
+          url = f'https://api.telegram.org/bot{token}/sendMessage'
+          message = f'🔍 *Inicio de Revisión de Seguridad*\n\n{ref_info}\nAutor: {author}\nEstado: ⏳ Analizando código...'
+          
+          try:
+              resp = requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+              print(f'Telegram response: {resp.status_code} {resp.text}')
+              resp.raise_for_status()
+          except Exception as e:
+              print(f'Failed to send notification: {e}')
           "
       
       - name: Ejecutar escáner de seguridad con ML
@@ -101,7 +126,7 @@ jobs:
           import os
           from pathlib import Path
           
-          MODEL_PATH = os.getenv('MODEL_PATH', 'models/modelo_seguridad_final.pkl')
+          MODEL_PATH = os.getenv('MODEL_PATH', 'models/modelo_seguridad_final2.pkl')
           
           class SecurityScannerML:
               def __init__(self):
@@ -120,7 +145,7 @@ jobs:
                   }
               
               def extract_features(self, code, filename):
-                  features = {'nloc': 0, 'avg_complexity': 0, 'max_complexity': 0, 'risk_keywords': 0}
+                  features = {'nloc': 0, 'avg_complexity': 0, 'max_complexity': 0, 'risk_keywords': 0, 'findings': []}
                   
                   try:
                       analysis = lizard.analyze_file.analyze_source_code(filename, code)
@@ -134,55 +159,89 @@ jobs:
                   lang = 'py' if ext == 'py' else ('js' if ext in ['js', 'jsx'] else ('ts' if ext in ['ts', 'tsx'] else ('java' if ext == 'java' else None)))
                   
                   if lang and lang in self.RISK_PATTERNS:
-                      for pattern in self.RISK_PATTERNS[lang]:
-                          if re.search(pattern, code, re.IGNORECASE):
-                              features['risk_keywords'] += 1
+                      lines = code.split('\n')
+                      for i, line in enumerate(lines):
+                          for pattern in self.RISK_PATTERNS[lang]:
+                              if re.search(pattern, line, re.IGNORECASE):
+                                  features['risk_keywords'] += 1
+                                  clean_pat = pattern.replace('\\', '')
+                                  # Capture the line content stripped of whitespace
+                                  clean_line = line.strip()[:100] # Limit length
+                                  features['findings'].append({
+                                      'line': i + 1,
+                                      'pattern': clean_pat,
+                                      'content': clean_line
+                                  })
                   
                   return features
               
               def analyze_files(self, files):
-                  results = []
-                  vulnerable_count = 0
-                  
-                  for file_path in files:
-                      try:
-                          with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                              code = f.read()
-                          
-                          features = self.extract_features(code, file_path)
-                          
-                          if self.model:
-                              df_input = pd.DataFrame([features])
-                              try:
-                                  probability = self.model.predict_proba(df_input)[0][1]
-                                  prediction = self.model.predict(df_input)[0]
-                                  is_vulnerable = prediction == 1
-                              except:
-                                  probability = features['risk_keywords'] / 10.0
-                                  is_vulnerable = features['risk_keywords'] > 2
-                          else:
-                              probability = features['risk_keywords'] / 10.0
-                              is_vulnerable = features['risk_keywords'] > 2
-                          
-                          result = {
-                              'file': file_path,
-                              'status': 'VULNERABLE' if is_vulnerable else 'SECURE',
-                              'risk_probability': float(probability),
-                              'risk_keywords': features['risk_keywords']
-                          }
-                          
-                          results.append(result)
-                          if is_vulnerable:
-                              vulnerable_count += 1
-                              
-                      except Exception as e:
-                          results.append({
-                              'file': file_path,
-                              'status': 'ERROR',
-                              'error': str(e)
-                          })
-                  
-                  return results, vulnerable_count
+                results = []
+                vulnerable_count = 0
+                
+                for file_path in files:
+                    try:
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            code = f.read()
+                        
+                        features = self.extract_features(code, file_path)
+                        
+                        # Model V2 expects: ['repo', 'sha', 'filename', 'code', 'label', 'nloc', 'avg_complexity', 'max_complexity', 'risk_keywords']
+                        # We must provide these columns. Warning: 'label' in input suggests leakage during training, but we must provide it to match schema.
+                        
+                        data_payload = {
+                            'repo': 'ChatEnTiempoRealV2',
+                            'sha': 'HEAD',
+                            'filename': file_path,
+                            'code': code,
+                            'label': 0, # Dummy value as we are predicting
+                            'nloc': features['nloc'],
+                            'avg_complexity': features['avg_complexity'],
+                            'max_complexity': features['max_complexity'],
+                            'risk_keywords': features['risk_keywords']
+                        }
+                        
+                        if self.model:
+                            df_input = pd.DataFrame([data_payload])
+                            # Ensure column order if necessary, though sklearn usually handles it by name if dataframe
+                            required_cols = ['repo', 'sha', 'filename', 'code', 'label', 'nloc', 'avg_complexity', 'max_complexity', 'risk_keywords']
+                            df_input = df_input[required_cols]
+                            
+                            try:
+                                probability = self.model.predict_proba(df_input)[0][1]
+                                prediction = self.model.predict(df_input)[0]
+                                is_vulnerable = prediction == 1
+                            except Exception as model_err:
+                                print(f"Model prediction error for {file_path}: {model_err}")
+                                # Fallback
+                                probability = features['risk_keywords'] / 10.0
+                                is_vulnerable = features['risk_keywords'] > 2
+                        else:
+                            probability = features['risk_keywords'] / 10.0
+                            is_vulnerable = features['risk_keywords'] > 2
+                        
+                        result = {
+                            'file': file_path,
+                            'status': 'VULNERABLE' if is_vulnerable else 'SECURE',
+                            'risk_probability': float(probability),
+                            'risk_keywords': features['risk_keywords'],
+                            'nloc': features['nloc'],
+                            'complexity': features['max_complexity'],
+                            'findings': features['findings']
+                        }
+                        
+                        results.append(result)
+                        if is_vulnerable:
+                            vulnerable_count += 1
+                            
+                    except Exception as e:
+                        results.append({
+                            'file': file_path,
+                            'status': 'ERROR',
+                            'error': str(e)
+                        })
+                
+                return results, vulnerable_count
           
           files_to_scan = []
           if os.path.exists('changed_files.txt'):
@@ -363,7 +422,7 @@ jobs:
           
           token = '${{ env.TELEGRAM_BOT_TOKEN }}'
           chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          pr_number = ${{ github.event.pull_request.number }}
+          ref_info = 'PR: #${{ github.event.pull_request.number }}' if '${{ github.event_name }}' == 'pull_request' else 'Push: ${{ github.ref_name }}'
           
           try:
               with open('security_result.json', 'r') as f:
@@ -386,25 +445,51 @@ jobs:
               url = f'https://api.telegram.org/bot{token}/sendMessage'
               
               if status == 'VULNERABLE':
-                  message = f'*🚨 VULNERABILIDAD DETECTADA*\n\n'
-                  message += f'PR: #{pr_number}\n'
+                  message = f'*🚨 VULNERABILIDAD DETECTADA (Modelo V2)*\n\n'
+                  message += f'{ref_info}\n'
                   message += f'Estado: ❌ RECHAZADO\n'
                   message += f'Riesgo máximo: {float(risk_prob)*100:.1f}%\n'
                   message += f'Archivos vulnerables: {len(vulnerable_files)}\n\n'
                   
                   if vulnerable_files:
-                      message += '*Archivos afectados:*\n'
-                      for i, file_path in enumerate(vulnerable_files[:5]):
-                          filename = file_path.split('/')[-1] if '/' in file_path else file_path
-                          message += f'{i+1}. \`{filename}\`\n'
+                      message += '*📝 DETALLES DE ARCHIVOS:*\n\n'
+                      count = 1
+                      for item in data.get('details', []):
+                          if item.get('status') == 'VULNERABLE':
+                              name = item.get('file', 'unknown')
+                              prob = float(item.get('risk_probability', 0)) * 100
+                              nloc = item.get('nloc', 0)
+                              comp = item.get('complexity', 0)
+                              
+                              # Escape special characters for Markdown
+                              display_name = name.replace('_', '\\_').replace('*', '\\*')
+
+                              message += f'📂 *Archivo {count}:* {display_name}\n'
+                              message += f'   ⚠️ Riesgo: {prob:.1f}%\n'
+                              message += f'   📏 Tamaño: {nloc} líneas | 🧠 Complejidad: {comp}\n'
+                              
+                              findings = item.get('findings', [])
+                              if findings:
+                                  message += '   🔍 *Código Detectado:*\n'
+                                  message += '```python\n'
+                                  for f in findings[:3]: # Limit to 3 snippets to save space
+                                      line_num = f['line']
+                                      content = f['content']
+                                      message += f'L{line_num}: {content}\n'
+                                  if len(findings) > 3:
+                                      message += f'... y {len(findings)-3} más'
+                                  message += '```\n\n'
+                              else:
+                                  message += '\n'
+                              count += 1
                       
                       if len(vulnerable_files) > 5:
-                          message += f'... y {len(vulnerable_files)-5} más\n'
+                          message += f'_... y {len(vulnerable_files)-5} archivos más_\n'
                   
                   message += '\n🔒 *Merge bloqueado*\n🛠️ *Se requiere corrección inmediata*'
               else:
                   message = f'*✅ CÓDIGO SEGURO*\n\n'
-                  message += f'PR: #{pr_number}\n'
+                  message += f'{ref_info}\n'
                   message += f'Estado: ✅ APROBADO\n'
                   message += f'Riesgo: {float(risk_prob)*100:.1f}%\n\n'
                   message += '✓ Continuando con el pipeline CI/CD'
@@ -421,7 +506,7 @@ jobs:
   build-and-test:
     name: Build & Test Frontend
     needs: security-review
-    if: needs.security-review.outputs.security_passed == 'true' && github.event_name == 'pull_request'
+    if: needs.security-review.outputs.security_passed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
@@ -439,17 +524,21 @@ jobs:
       
       - name: Notificar inicio de build
         run: |
-          python -c "
-          import requests
-          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
-          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          pr_number = ${{ github.event.pull_request.number }}
+          token="${{ env.TELEGRAM_BOT_TOKEN }}"
+          chat_id="${{ env.TELEGRAM_CHAT_ID }}"
           
-          if token and chat_id:
-              url = f'https://api.telegram.org/bot{token}/sendMessage'
-              message = f'🏗️ *Inicio de Build y Tests*\n\nPR: #{pr_number}\\nEstado: 🔨 Construyendo aplicación...'
-              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
-          "
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            ref_info="PR: #${{ github.event.pull_request.number }}"
+          else
+            ref_info="Push: ${{ github.ref_name }}"
+          fi
+          
+          message="🏗️ *Inicio de Build y Tests*%0A%0A${ref_info}%0AEstado: 🔨 Construyendo aplicación..."
+          
+          curl -s -X POST "https://api.telegram.org/bot${token}/sendMessage" \
+            -d chat_id="${chat_id}" \
+            -d text="${message}" \
+            -d parse_mode="Markdown"
       
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
@@ -506,34 +595,119 @@ jobs:
       - name: Notificar resultado de tests
         if: always()
         run: |
-          python -c "
-          import requests
-          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
-          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          pr_number = ${{ github.event.pull_request.number }}
-          job_status = '${{ job.status }}'
+          token="${{ env.TELEGRAM_BOT_TOKEN }}"
+          chat_id="${{ env.TELEGRAM_CHAT_ID }}"
           
-          if token and chat_id:
-              url = f'https://api.telegram.org/bot{token}/sendMessage'
-              
-              if job_status == 'success':
-                  message = f'✅ *Tests Exitosos*\n\nPR: #{pr_number}\\nEstado: ✅ Todos los tests pasaron\\n\\n✓ Continuando con despliegue.'
-              else:
-                  message = f'❌ *Tests Fallidos*\n\nPR: #{pr_number}\\nEstado: ❌ Tests fallaron\\n\\n⚠️ Pipeline detenido.'
-              
-              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
-          "
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            ref_info="PR: #${{ github.event.pull_request.number }}"
+          else
+            ref_info="Push: ${{ github.ref_name }}"
+          fi
+          
+          if [ "${{ job.status }}" == "success" ]; then
+             message="✅ *Tests Exitosos*%0A%0A${ref_info}%0AEstado: ✅ Todos los tests pasaron%0A%0A✓ Continuando."
+          else
+             message="❌ *Tests Fallidos*%0A%0A${ref_info}%0AEstado: ❌ Tests fallaron%0A%0A⚠️ Pipeline detenido."
+          fi
+          
+          curl -s -X POST "https://api.telegram.org/bot${token}/sendMessage" \
+            -d chat_id="${chat_id}" \
+            -d text="${message}" \
+            -d parse_mode="Markdown"
     
     outputs:
       build_passed: ${{ job.status == 'success' }}
 
+  # ========== ETAPA 2B: VERIFICACIÓN DEL BACKEND ==========
+  backend-verification:
+    name: Backend Verification
+    needs: security-review
+    if: needs.security-review.outputs.security_passed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    defaults:
+      run:
+        working-directory: ./backend
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Notificar inicio de tests backend
+        run: |
+          token="${{ env.TELEGRAM_BOT_TOKEN }}"
+          chat_id="${{ env.TELEGRAM_CHAT_ID }}"
+          
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            ref_info="PR: #${{ github.event.pull_request.number }}"
+          else
+            ref_info="Push: ${{ github.ref_name }}"
+          fi
+          
+          message="🔙 *Inicio de Tests Backend*%0A%0A${ref_info}%0AEstado: 🧪 Ejecutando Jest..."
+          
+          curl -s -X POST "https://api.telegram.org/bot${token}/sendMessage" \
+            -d chat_id="${chat_id}" \
+            -d text="${message}" \
+            -d parse_mode="Markdown"
+      
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run Backend Tests
+        run: npm test
+        env:
+          NODE_ENV: test
+          MONGODB_URI: mongodb://localhost:27017/test_db
+          JWT_SECRET: test_secret_key
+          ENCRYPTION_KEY: test_encryption_key_32_chars_longgggg
+          
+      - name: Notificar resultado backend
+        if: always()
+        run: |
+          token="${{ env.TELEGRAM_BOT_TOKEN }}"
+          chat_id="${{ env.TELEGRAM_CHAT_ID }}"
+          
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            ref_info="PR: #${{ github.event.pull_request.number }}"
+          else
+            ref_info="Push: ${{ github.ref_name }}"
+          fi
+          
+          if [ "${{ job.status }}" == "success" ]; then
+             message="✅ *Backend Tests Exitosos*%0A%0A${ref_info}%0AEstado: ✅ Todos los tests pasaron"
+          else
+             message="❌ *Backend Tests Fallidos*%0A%0A${ref_info}%0AEstado: ❌ Tests fallaron"
+          fi
+          
+          curl -s -X POST "https://api.telegram.org/bot${token}/sendMessage" \
+            -d chat_id="${chat_id}" \
+            -d text="${message}" \
+            -d parse_mode="Markdown"
+
+    outputs:
+      backend_passed: ${{ job.status == 'success' }}
+
   # ========== ETAPA 3: MERGE AUTOMÁTICO A TEST ==========
   merge-to-test:
     name: Merge Automático a Test
-    needs: [security-review, build-and-test]
+    needs: [security-review, build-and-test, backend-verification]
     if: |
       needs.security-review.outputs.security_passed == 'true' &&
       needs.build-and-test.outputs.build_passed == 'true' &&
+      needs.backend-verification.outputs.backend_passed == 'true' &&
       github.event_name == 'pull_request' &&
       github.base_ref == 'test'
     runs-on: ubuntu-latest
@@ -604,10 +778,11 @@ jobs:
   # ========== ETAPA 5: MERGE A MAIN Y DESPLIEGUE ==========
   deploy-production:
     name: Despliegue en Producción
-    needs: [security-review, build-and-test, lighthouse]
+    needs: [security-review, build-and-test, backend-verification, lighthouse]
     if: |
       needs.security-review.outputs.security_passed == 'true' &&
       needs.build-and-test.outputs.build_passed == 'true' &&
+      needs.backend-verification.outputs.backend_passed == 'true' &&
       github.event_name == 'pull_request' &&
       github.base_ref == 'main'
     runs-on: ubuntu-latest
@@ -649,7 +824,7 @@ jobs:
           import requests
           token = '${{ env.TELEGRAM_BOT_TOKEN }}'
           chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          pr_number = ${{ github.event.pull_request.number }}
+          pr_number = '${{ github.event.pull_request.number }}'
           deploy_url = '${{ env.DEPLOY_URL }}'
           
           if token and chat_id:
@@ -668,7 +843,7 @@ jobs:
   notify-failure:
     name: Notificar Fallos
     if: always() && (failure() || cancelled())
-    needs: [security-review, build-and-test, deploy-production]
+    needs: [security-review, build-and-test, backend-verification, deploy-production]
     runs-on: ubuntu-latest
     
     
@@ -676,15 +851,18 @@ jobs:
       - name: Notificar fallo general
         if: failure()
         run: |
-          python -c "
-          import requests
-          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
-          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          pr_number = ${{ github.event.pull_request.number }}
-          workflow = '${{ github.workflow }}'
+          token="${{ env.TELEGRAM_BOT_TOKEN }}"
+          chat_id="${{ env.TELEGRAM_CHAT_ID }}"
           
-          if token and chat_id:
-              url = f'https://api.telegram.org/bot{token}/sendMessage'
-              message = f'❌ *Pipeline Falló*\n\nPR: #{pr_number}\\nWorkflow: {workflow}\\nEstado: ❌ FALLO\\n\\n⚠️ Revisar los logs de GitHub Actions.'
-              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
-          "
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            ref_info="PR: #${{ github.event.pull_request.number }}"
+          else
+            ref_info="Push: ${{ github.ref_name }}"
+          fi
+          
+          message="❌ *Pipeline Falló*%0A%0A${ref_info}%0AWorkflow: ${{ github.workflow }}%0AEstado: ❌ FALLO%0A%0A⚠️ Revisar los logs de GitHub Actions."
+          
+          curl -s -X POST "https://api.telegram.org/bot${token}/sendMessage" \
+            -d chat_id="${chat_id}" \
+            -d text="${message}" \
+            -d parse_mode="Markdown"
