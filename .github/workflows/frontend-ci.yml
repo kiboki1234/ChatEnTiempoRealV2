@@ -111,12 +111,21 @@ jobs:
               print(f'Failed to send notification: {e}')
           "
       
-      - name: Ejecutar escáner de seguridad con ML
+      - name: Ejecutar escáner de seguridad integrado (ML + Detección Detallada)
         id: security-scan
         run: |
-          echo "Ejecutando análisis de seguridad con modelo de minería de datos..."
+          echo "Ejecutando análisis de seguridad integrado..."
+          echo "- Modelo de Machine Learning"
+          echo "- Detección detallada de vulnerabilidades"
+          echo "- Identificación de líneas y severidad"
           
-          cat > security_scanner.py << 'EOF'
+          # Copiar el escáner integrado
+          if [ -f ".github/scripts/integrated_security_scanner.py" ]; then
+            echo "✓ Usando escáner integrado"
+            cp .github/scripts/integrated_security_scanner.py security_scanner.py
+          else
+            echo "⚠ Escáner integrado no encontrado, usando fallback..."
+            cat > security_scanner.py << 'EOF'
           import sys
           import json
           import joblib
@@ -306,19 +315,36 @@ jobs:
             let vulnerableFiles = [];
             let totalFiles = 0;
             let vulnerabilitiesFound = 0;
+            let totalVulnerabilities = 0;
             
             try {
               const result = JSON.parse(fs.readFileSync('security_result.json', 'utf8'));
               totalFiles = result.files_analyzed || 0;
-              vulnerabilitiesFound = result.vulnerabilities_found || 0;
+              totalVulnerabilities = result.total_vulnerabilities || 0;
               
-              vulnerableFiles = result.details.filter(file => 
-                file.status === 'VULNERABLE'
-              ).map(file => ({
-                path: file.file,
-                probability: (file.risk_probability * 100).toFixed(1) + '%',
-                risk_keywords: file.risk_keywords || 0
-              }));
+              // Nuevo formato con detalles completos
+              if (result.results) {
+                vulnerableFiles = result.results.filter(file => 
+                  file.status === 'VULNERABLE'
+                ).map(file => ({
+                  path: file.file,
+                  probability: (file.ml_probability * 100).toFixed(1) + '%',
+                  vulnerability_count: file.vulnerability_count || 0,
+                  max_severity: file.max_severity || 'UNKNOWN',
+                  by_severity: file.by_severity || {},
+                  by_type: file.by_type || {},
+                  vulnerabilities: file.vulnerabilities || []
+                }));
+              } else if (result.details) {
+                // Formato antiguo (fallback)
+                vulnerableFiles = result.details.filter(file => 
+                  file.status === 'VULNERABLE'
+                ).map(file => ({
+                  path: file.file,
+                  probability: (file.risk_probability * 100).toFixed(1) + '%',
+                  risk_keywords: file.risk_keywords || 0
+                }));
+              }
               
             } catch (e) {
               console.error('Error reading security result:', e);
@@ -326,23 +352,63 @@ jobs:
             
             const isVulnerable = '${{ steps.security-scan.outputs.is_vulnerable }}' === 'true';
             const riskProb = parseFloat('${{ steps.security-scan.outputs.risk_probability }}') || 0;
+            const totalVulns = parseInt('${{ steps.security-scan.outputs.total_vulnerabilities }}') || totalVulnerabilities;
             
+            // Construir lista detallada de vulnerabilidades
             let vulnerableFilesList = '';
             if (vulnerableFiles.length > 0) {
               vulnerableFilesList = '### 📋 Archivos Vulnerables Detectados:\n\n';
+              
               vulnerableFiles.forEach((file, index) => {
-                vulnerableFilesList += `${index + 1}. **${file.path}**\n`;
-                vulnerableFilesList += `   - Probabilidad de riesgo: ${file.probability}\n`;
-                vulnerableFilesList += `   - Patrones de riesgo detectados: ${file.risk_keywords}\n\n`;
+                const severityIcon = {
+                  'CRITICAL': '🔴',
+                  'HIGH': '🟠',
+                  'MEDIUM': '🟡',
+                  'LOW': '🔵',
+                  'INFO': '⚪'
+                };
+                
+                const icon = severityIcon[file.max_severity] || '⚫';
+                
+                vulnerableFilesList += `${index + 1}. ${icon} **${file.path}**\n`;
+                vulnerableFilesList += `   - **Severidad máxima:** ${file.max_severity}\n`;
+                vulnerableFilesList += `   - **Vulnerabilidades encontradas:** ${file.vulnerability_count}\n`;
+                vulnerableFilesList += `   - **Probabilidad ML:** ${file.probability}\n`;
+                
+                if (file.by_severity && Object.keys(file.by_severity).length > 0) {
+                  vulnerableFilesList += `   - **Por severidad:** ${JSON.stringify(file.by_severity)}\n`;
+                }
+                
+                if (file.by_type && Object.keys(file.by_type).length > 0) {
+                  vulnerableFilesList += `   - **Por tipo:** ${JSON.stringify(file.by_type)}\n`;
+                }
+                
+                // Mostrar las vulnerabilidades más críticas
+                if (file.vulnerabilities && file.vulnerabilities.length > 0) {
+                  vulnerableFilesList += `\n   **Detalles de vulnerabilidades:**\n`;
+                  file.vulnerabilities.slice(0, 5).forEach((vuln, vIdx) => {
+                    vulnerableFilesList += `   ${vIdx + 1}. **${vuln.type}** (${vuln.severity}) - Línea ${vuln.line}\n`;
+                    vulnerableFilesList += `      - Código: \`${vuln.code.substring(0, 60)}...\`\n`;
+                    vulnerableFilesList += `      - ${vuln.description}\n`;
+                    vulnerableFilesList += `      - ✅ Recomendación: ${vuln.recommendation}\n`;
+                  });
+                  
+                  if (file.vulnerabilities.length > 5) {
+                    vulnerableFilesList += `   ... y ${file.vulnerabilities.length - 5} más\n`;
+                  }
+                }
+                
+                vulnerableFilesList += '\n';
               });
             }
             
-            const comment = `## 🔍 Resultado de Revisión de Seguridad (Modelo de Minería de Datos)
+            const comment = `## 🔍 Resultado de Revisión de Seguridad Integrada
             
             **Estado:** ${isVulnerable ? '❌ VULNERABLE' : '✅ SEGURO'}
             **Probabilidad de riesgo máxima:** ${(riskProb * 100).toFixed(1)}%
             **Archivos analizados:** ${totalFiles}
-            **Vulnerabilidades detectadas:** ${vulnerabilitiesFound}
+            **Archivos vulnerables:** ${vulnerableFiles.length}
+            **Total de vulnerabilidades:** ${totalVulns}
 
             ${isVulnerable ? '## ❌ MERGE BLOQUEADO - Se requiere corrección de vulnerabilidades' : '## ✅ APROBADO - El código es seguro para continuar'}
 
