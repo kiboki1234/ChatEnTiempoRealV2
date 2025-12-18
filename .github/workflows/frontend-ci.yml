@@ -23,7 +23,10 @@ jobs:
     # ========== ETAPA 1: REVISIÓN DE SEGURIDAD CON MINERÍA DE DATOS ==========
   security-review:
     name: Revisión de Seguridad con ML
-    if: github.event_name == 'pull_request' && (github.base_ref == 'test' || github.base_ref == 'main')
+    # Ejecutar en PRs (hacia test/main) O en Pushes (a main/test/develop)
+    if: |
+      (github.event_name == 'pull_request' && (github.base_ref == 'test' || github.base_ref == 'main')) ||
+      (github.event_name == 'push')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -88,19 +91,17 @@ jobs:
           token = os.environ.get('TELEGRAM_BOT_TOKEN')
           chat_id = os.environ.get('TELEGRAM_CHAT_ID')
           
-          print(f'Token Present: {bool(token)}')
-          print(f'Chat ID Present: {bool(chat_id)}')
+          # Handle Push vs PR
+          event_name = '${{ github.event_name }}'
+          if event_name == 'pull_request':
+              ref_info = 'PR: #${{ github.event.pull_request.number }}'
+          else:
+              ref_info = 'Push: ${{ github.ref_name }}'
           
-          if not token or not chat_id:
-             print('Error: Missing telegram credentials')
-             # Don't fail the build just for this, but log it
-             sys.exit(0)
-
-          pr_number = '${{ github.event.pull_request.number }}'
-          author = '${{ github.event.pull_request.user.login }}'
+          author = '${{ github.actor }}'
           
           url = f'https://api.telegram.org/bot{token}/sendMessage'
-          message = f'🔍 *Inicio de Revisión de Seguridad*\n\nPR: #{pr_number}\nAutor: {author}\nEstado: ⏳ Analizando código...'
+          message = f'🔍 *Inicio de Revisión de Seguridad*\n\n{ref_info}\nAutor: {author}\nEstado: ⏳ Analizando código...'
           
           try:
               resp = requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
@@ -387,7 +388,7 @@ jobs:
           
           token = '${{ env.TELEGRAM_BOT_TOKEN }}'
           chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          pr_number = ${{ github.event.pull_request.number }}
+          ref_info = 'PR: #${{ github.event.pull_request.number }}' if '${{ github.event_name }}' == 'pull_request' else 'Push: ${{ github.ref_name }}'
           
           try:
               with open('security_result.json', 'r') as f:
@@ -411,7 +412,7 @@ jobs:
               
               if status == 'VULNERABLE':
                   message = f'*🚨 VULNERABILIDAD DETECTADA*\n\n'
-                  message += f'PR: #{pr_number}\n'
+                  message += f'{ref_info}\n'
                   message += f'Estado: ❌ RECHAZADO\n'
                   message += f'Riesgo máximo: {float(risk_prob)*100:.1f}%\n'
                   message += f'Archivos vulnerables: {len(vulnerable_files)}\n\n'
@@ -428,7 +429,7 @@ jobs:
                   message += '\n🔒 *Merge bloqueado*\n🛠️ *Se requiere corrección inmediata*'
               else:
                   message = f'*✅ CÓDIGO SEGURO*\n\n'
-                  message += f'PR: #{pr_number}\n'
+                  message += f'{ref_info}\n'
                   message += f'Estado: ✅ APROBADO\n'
                   message += f'Riesgo: {float(risk_prob)*100:.1f}%\n\n'
                   message += '✓ Continuando con el pipeline CI/CD'
@@ -445,7 +446,7 @@ jobs:
   build-and-test:
     name: Build & Test Frontend
     needs: security-review
-    if: needs.security-review.outputs.security_passed == 'true' && github.event_name == 'pull_request'
+    if: needs.security-review.outputs.security_passed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
@@ -467,11 +468,11 @@ jobs:
           import requests
           token = '${{ env.TELEGRAM_BOT_TOKEN }}'
           chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          pr_number = ${{ github.event.pull_request.number }}
+          ref_info = 'PR: #${{ github.event.pull_request.number }}' if '${{ github.event_name }}' == 'pull_request' else 'Push: ${{ github.ref_name }}'
           
           if token and chat_id:
               url = f'https://api.telegram.org/bot{token}/sendMessage'
-              message = f'🏗️ *Inicio de Build y Tests*\n\nPR: #{pr_number}\\nEstado: 🔨 Construyendo aplicación...'
+              message = f'🏗️ *Inicio de Build y Tests*\n\n{ref_info}\\nEstado: 🔨 Construyendo aplicación...'
               requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
           "
       
@@ -541,9 +542,9 @@ jobs:
               url = f'https://api.telegram.org/bot{token}/sendMessage'
               
               if job_status == 'success':
-                  message = f'✅ *Tests Exitosos*\n\nPR: #{pr_number}\\nEstado: ✅ Todos los tests pasaron\\n\\n✓ Continuando con despliegue.'
+                  message = f'✅ *Tests Exitosos*\n\n{ref_info}\\nEstado: ✅ Todos los tests pasaron\\n\\n✓ Continuando.'
               else:
-                  message = f'❌ *Tests Fallidos*\n\nPR: #{pr_number}\\nEstado: ❌ Tests fallaron\\n\\n⚠️ Pipeline detenido.'
+                  message = f'❌ *Tests Fallidos*\n\n{ref_info}\\nEstado: ❌ Tests fallaron\\n\\n⚠️ Pipeline detenido.'
               
               requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
           "
@@ -555,7 +556,7 @@ jobs:
   backend-verification:
     name: Backend Verification
     needs: security-review
-    if: needs.security-review.outputs.security_passed == 'true' && github.event_name == 'pull_request'
+    if: needs.security-review.outputs.security_passed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     
@@ -577,11 +578,11 @@ jobs:
           import requests
           token = '${{ env.TELEGRAM_BOT_TOKEN }}'
           chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          pr_number = ${{ github.event.pull_request.number }}
+          ref_info = 'PR: #${{ github.event.pull_request.number }}' if '${{ github.event_name }}' == 'pull_request' else 'Push: ${{ github.ref_name }}'
           
           if token and chat_id:
               url = f'https://api.telegram.org/bot{token}/sendMessage'
-              message = f'🔙 *Inicio de Tests Backend*\n\nPR: #{pr_number}\\nEstado: 🧪 Ejecutando Jest...'
+              message = f'🔙 *Inicio de Tests Backend*\n\n{ref_info}\\nEstado: 🧪 Ejecutando Jest...'
               requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
           "
       
@@ -610,16 +611,16 @@ jobs:
           import requests
           token = '${{ env.TELEGRAM_BOT_TOKEN }}'
           chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          pr_number = ${{ github.event.pull_request.number }}
+          ref_info = 'PR: #${{ github.event.pull_request.number }}' if '${{ github.event_name }}' == 'pull_request' else 'Push: ${{ github.ref_name }}'
           job_status = '${{ job.status }}'
           
           if token and chat_id:
               url = f'https://api.telegram.org/bot{token}/sendMessage'
               
               if job_status == 'success':
-                  message = f'✅ *Backend Tests Exitosos*\n\nPR: #{pr_number}\\nEstado: ✅ Todos los tests pasaron'
+                  message = f'✅ *Backend Tests Exitosos*\n\n{ref_info}\\nEstado: ✅ Todos los tests pasaron'
               else:
-                  message = f'❌ *Backend Tests Fallidos*\n\nPR: #{pr_number}\\nEstado: ❌ Tests fallaron'
+                  message = f'❌ *Backend Tests Fallidos*\n\n{ref_info}\\nEstado: ❌ Tests fallaron'
               
               requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
           "
@@ -751,7 +752,7 @@ jobs:
           import requests
           token = '${{ env.TELEGRAM_BOT_TOKEN }}'
           chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          pr_number = ${{ github.event.pull_request.number }}
+          pr_number = '${{ github.event.pull_request.number }}'
           deploy_url = '${{ env.DEPLOY_URL }}'
           
           if token and chat_id:
@@ -781,7 +782,7 @@ jobs:
           import requests
           token = '${{ env.TELEGRAM_BOT_TOKEN }}'
           chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          pr_number = ${{ github.event.pull_request.number }}
+          pr_number = '${{ github.event.pull_request.number }}'
           workflow = '${{ github.workflow }}'
           
           if token and chat_id:
