@@ -12,7 +12,7 @@ Proyecto de chat en tiempo real con seguridad integrada y CI/CD.
 **Desarrollo de Software Seguro*
 
 ## 📋 Chat Bot
-t.me/proyecto_software_seguro_bot
+[https://t.me/SWESPEBOT](https://t.me/SWESPEBOT)
 
 ## 📋 Tabla de Contenidos
 

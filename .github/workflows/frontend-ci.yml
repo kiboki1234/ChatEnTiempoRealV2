@@ -90,22 +90,6 @@ jobs:
           
           token = os.environ.get('TELEGRAM_BOT_TOKEN')
           chat_id = os.environ.get('TELEGRAM_CHAT_ID')
-
-          print(f'Python DEBUG - Token present: {token is not None}')
-          print(f'Python DEBUG - Chat ID present: {chat_id is not None}')
-
-          if token and chat_id:
-            url = f'https://api.telegram.org/bot{token}/sendMessage'
-            message = f'🔍 *Inicio de Revisión de Seguridad*...'
-            print(f'Python DEBUG - Attempting to send to URL: {url}')
-            try:
-                response = requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
-                print(f'Python DEBUG - Response Status Code: {response.status_code}')
-                print(f'Python DEBUG - Response Text: {response.text}')
-            except Exception as e:
-                print(f'Python DEBUG - Exception occurred: {e}')
-          else:
-            print('Python DEBUG - Token or Chat ID is missing. Message not sent.')
           
           # Handle Push vs PR
           event_name = '${{ github.event_name }}'
