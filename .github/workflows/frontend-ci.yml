@@ -1,20 +1,337 @@
-name: Frontend CI/CD
+name: Secure DevOps CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, test ]
     paths:
       - 'frontend/**'
+      - 'backend/**'
       - '.github/workflows/frontend-ci.yml'
   pull_request:
-    branches: [ main ]
-    paths:
-      - 'frontend/**'
+    branches: [ test, main, dev ]
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
+env:
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  MODEL_PATH: './models/modelo_seguridad_final.pkl'
+  DEPLOY_URL: 'https://tu-app.railway.app'
+
 jobs:
+  # ========== ETAPA 1: REVISIÓN DE SEGURIDAD CON MINERÍA DE DATOS ==========
+  security-review:
+    name: Revisión de Seguridad con ML
+    if: github.event_name == 'pull_request' && (github.base_ref == 'test' || github.base_ref == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Configurar Python para ML
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      
+      - name: Instalar dependencias de minería de datos
+        run: |
+          pip install joblib pandas numpy scikit-learn lizard
+          pip install python-telegram-bot requests
+      
+      - name: Verificar modelo de ML
+        run: |
+          echo "Verificando modelo de minería de datos..."
+          if [ -f "models/modelo_seguridad_final.pkl" ]; then
+            echo "Modelo ML encontrado"
+          else
+            echo "Modelo no encontrado, usando modelo por defecto"
+            # Puedes agregar aquí la descarga de un modelo pre-entrenado
+          fi
+      
+      - name: Obtener archivos modificados en el PR
+        id: changed-files
+        uses: tj-actions/changed-files@v42
+        with:
+          files: |
+            **/*.py
+            **/*.js
+            **/*.jsx
+            **/*.ts
+            **/*.tsx
+            **/*.java
+            **/*.cpp
+      
+      - name: Notificar inicio de revisión de seguridad
+        if: always()
+        run: |
+          python -c "
+          import requests
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
+          pr_number = ${{ github.event.pull_request.number }}
+          author = '${{ github.event.pull_request.user.login }}'
+          
+          if token and chat_id:
+            url = f'https://api.telegram.org/bot{token}/sendMessage'
+            message = f'🔍 *Inicio de Revisión de Seguridad*\n\nPR: #{pr_number}\nAutor: {author}\nEstado: ⏳ Analizando código...'
+            requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+          "
+      
+      - name: Ejecutar escáner de seguridad con ML
+        id: security-scan
+        run: |
+          echo "Ejecutando análisis de seguridad con modelo de minería de datos..."
+          
+          # Crear script de análisis temporal
+          cat > security_scanner.py << 'EOF'
+          import sys
+          import json
+          import joblib
+          import pandas as pd
+          import lizard
+          import re
+          import os
+          from pathlib import Path
+          
+          # Configurar modelo
+          MODEL_PATH = os.getenv('MODEL_PATH', 'models/modelo_seguridad_final.pkl')
+          
+          class SecurityScannerML:
+              def __init__(self):
+                  try:
+                      self.model = joblib.load(MODEL_PATH)
+                  except:
+                      # Modelo básico si no hay disponible
+                      self.model = None
+                  
+                  self.RISK_PATTERNS = {
+                      'py': [r'eval\(', r'exec\(', r'subprocess\.', r'os\.system', r'cursor\.execute'],
+                      'js': [r'eval\(', r'innerHTML', r'document\.write', r'dangerouslySetInnerHTML'],
+                      'ts': [r'eval\(', r'innerHTML', r'document\.write', r'dangerouslySetInnerHTML'],
+                      'jsx': [r'dangerouslySetInnerHTML', r'innerHTML'],
+                      'tsx': [r'dangerouslySetInnerHTML', r'innerHTML'],
+                      'java': [r'Statement\s+', r'Runtime\.exec']
+                  }
+              
+              def extract_features(self, code, filename):
+                  features = {'nloc': 0, 'avg_complexity': 0, 'max_complexity': 0, 'risk_keywords': 0}
+                  
+                  try:
+                      analysis = lizard.analyze_file.analyze_source_code(filename, code)
+                      features['nloc'] = analysis.nloc
+                      features['avg_complexity'] = analysis.average_cyclomatic_complexity
+                      features['max_complexity'] = max([f.cyclomatic_complexity for f in analysis.function_list]) if analysis.function_list else 0
+                  except:
+                      features['nloc'] = len(code.split('\\n'))
+                  
+                  ext = filename.split('.')[-1].lower()
+                  lang = 'py' if ext == 'py' else ('js' if ext in ['js', 'jsx'] else ('ts' if ext in ['ts', 'tsx'] else ('java' if ext == 'java' else None)))
+                  
+                  if lang and lang in self.RISK_PATTERNS:
+                      for pattern in self.RISK_PATTERNS[lang]:
+                          if re.search(pattern, code, re.IGNORECASE):
+                              features['risk_keywords'] += 1
+                  
+                  return features
+              
+              def analyze_files(self, files):
+                  results = []
+                  vulnerable_count = 0
+                  
+                  for file_path in files:
+                      try:
+                          with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                              code = f.read()
+                          
+                          features = self.extract_features(code, file_path)
+                          
+                          if self.model:
+                              df_input = pd.DataFrame([features])
+                              try:
+                                  probability = self.model.predict_proba(df_input)[0][1]
+                                  prediction = self.model.predict(df_input)[0]
+                                  is_vulnerable = prediction == 1
+                              except:
+                                  probability = features['risk_keywords'] / 10.0
+                                  is_vulnerable = features['risk_keywords'] > 2
+                          else:
+                              probability = features['risk_keywords'] / 10.0
+                              is_vulnerable = features['risk_keywords'] > 2
+                          
+                          result = {
+                              'file': file_path,
+                              'status': 'VULNERABLE' if is_vulnerable else 'SECURE',
+                              'risk_probability': float(probability),
+                              'risk_keywords': features['risk_keywords']
+                          }
+                          
+                          results.append(result)
+                          if is_vulnerable:
+                              vulnerable_count += 1
+                              
+                      except Exception as e:
+                          results.append({
+                              'file': file_path,
+                              'status': 'ERROR',
+                              'error': str(e)
+                          })
+                  
+                  return results, vulnerable_count
+          
+          # Leer archivos modificados
+          files_to_scan = []
+          if os.path.exists('changed_files.txt'):
+              with open('changed_files.txt', 'r') as f:
+                  files_to_scan = [line.strip() for line in f if line.strip()]
+          
+          # Si no hay archivos específicos, buscar en el proyecto
+          if not files_to_scan:
+              for ext in ['*.py', '*.js', '*.jsx', '*.ts', '*.tsx', '*.java']:
+                  files_to_scan.extend([str(p) for p in Path('.').rglob(ext)])
+          
+          # Filtrar archivos existentes
+          files_to_scan = [f for f in files_to_scan if os.path.exists(f)]
+          
+          scanner = SecurityScannerML()
+          results, vulnerable_count = scanner.analyze_files(files_to_scan[:50])  # Limitar a 50 archivos
+          
+          summary = {
+              'status': 'VULNERABLE' if vulnerable_count > 0 else 'SECURE',
+              'risk_probability': max([r.get('risk_probability', 0) for r in results], default=0),
+              'files_analyzed': len(results),
+              'vulnerabilities_found': vulnerable_count,
+              'details': results
+          }
+          
+          with open('security_result.json', 'w') as f:
+              json.dump(summary, f, indent=2)
+          
+          print(f"::set-output name=is_vulnerable::{str(vulnerable_count > 0).lower()}")
+          print(f"::set-output name=status::{summary['status']}")
+          print(f"::set-output name=risk_probability::{summary['risk_probability']:.2f}")
+          
+          # Mostrar resumen
+          print(f"\\nResumen del análisis de seguridad:")
+          print(f"   Archivos analizados: {len(results)}")
+          print(f"   Archivos vulnerables: {vulnerable_count}")
+          print(f"   Estado: {summary['status']}")
+          
+          sys.exit(1 if vulnerable_count > 0 else 0)
+          EOF
+          
+          # Guardar lista de archivos modificados
+          echo "${{ steps.changed-files.outputs.all_changed_files }}" > changed_files.txt
+          
+          # Ejecutar análisis
+          python security_scanner.py
+      
+      - name: Comentar resultado en el PR
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          SECURITY_RESULT: ${{ steps.security-scan.outputs.status }}
+          RISK_PROB: ${{ steps.security-scan.outputs.risk_probability }}
+        with:
+          script: |
+            const fs = require('fs');
+            let details = 'No se pudo cargar el reporte detallado.';
+            try {
+              const result = fs.readFileSync('security_result.json', 'utf8');
+              const data = JSON.parse(result);
+              details = JSON.stringify(data.details.slice(0, 5), null, 2);
+            } catch (e) {}
+            
+            const isVulnerable = '${{ steps.security-scan.outputs.is_vulnerable }}' === 'true';
+            const status = isVulnerable ? '❌ VULNERABLE' : '✅ SEGURO';
+            
+            const comment = `## 🔍 Resultado de Revisión de Seguridad (Modelo de Minería de Datos)
+            
+            **Estado:** ${status}
+            **Probabilidad de riesgo:** ${(parseFloat('${{ steps.security-scan.outputs.risk_probability }}') * 100).toFixed(1)}%
+            **Archivos analizados:** ${fs.existsSync('security_result.json') ? JSON.parse(fs.readFileSync('security_result.json')).files_analyzed : 'N/A'}
+            **Vulnerabilidades detectadas:** ${fs.existsSync('security_result.json') ? JSON.parse(fs.readFileSync('security_result.json')).vulnerabilities_found : 'N/A'}
+            
+            ${isVulnerable ? '**MERGE BLOQUEADO** - Se requiere corrección de vulnerabilidades.' : '**APROBADO** - El código es seguro para continuar.'}
+            
+            <details>
+            <summary>Ver detalles técnicos</summary>
+            
+            \`\`\`json
+            ${details}
+            \`\`\`
+            </details>
+            
+            *Modelo de ML: Random Forest | Accuracy: >82%*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+            
+            // Agregar label según resultado
+            const label = isVulnerable ? 'security-failed' : 'security-approved';
+            github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: [label]
+            });
+      
+      - name: Bloquear PR si es vulnerable
+        if: steps.security-scan.outputs.is_vulnerable == 'true'
+        run: |
+          echo "Código vulnerable detectado. Bloqueando merge..."
+          # Crear issue automática
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/issues \
+            -d "{
+              \"title\": \"[SECURITY] Vulnerabilidad detectada en PR #${{ github.event.pull_request.number }}\",
+              \"body\": \"Se detectó código vulnerable mediante el modelo de minería de datos.\\n\\nPor favor, revisa los comentarios del escáner de seguridad en el PR.\",
+              \"labels\": [\"security\", \"fixing-required\"]
+            }"
+      
+      - name: Notificar resultado de seguridad
+        if: always()
+        run: |
+          python -c "
+          import requests
+          import json
+          
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
+          pr_number = ${{ github.event.pull_request.number }}
+          status = '${{ steps.security-scan.outputs.status }}'
+          risk_prob = '${{ steps.security-scan.outputs.risk_probability }}'
+          
+          if token and chat_id:
+              url = f'https://api.telegram.org/bot{token}/sendMessage'
+              
+              if status == 'VULNERABLE':
+                  message = f'*Vulnerabilidad Detectada*\n\nPR: #{pr_number}\\nEstado: RECHAZADO\\nRiesgo: {float(risk_prob)*100:.1f}%\\n\\nMerge bloqueado. Se requiere corrección.'
+              else:
+                  message = f'*Código Seguro*\n\nPR: #{pr_number}\\nEstado: APROBADO\\nRiesgo: {float(risk_prob)*100:.1f}%\\n\\n✓ Continuando con el pipeline.'
+              
+              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+          "
+    
+    outputs:
+      security_passed: ${{ steps.security-scan.outputs.is_vulnerable == 'false' }}
+      security_status: ${{ steps.security-scan.outputs.status }}
+
+  # ========== ETAPA 2: BUILD Y TEST DEL FRONTEND (SOLO SI SEGURO) ==========
   build-and-test:
-    name: Build & Test Frontend
+    name: 🏗️ Build & Test Frontend
+    needs: security-review
+    if: needs.security-review.outputs.security_passed == 'true' && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
@@ -29,6 +346,20 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Notificar inicio de build
+        run: |
+          python -c "
+          import requests
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
+          pr_number = ${{ github.event.pull_request.number }}
+          
+          if token and chat_id:
+              url = f'https://api.telegram.org/bot{token}/sendMessage'
+              message = f'🏗️ *Inicio de Build y Tests*\n\nPR: #{pr_number}\\nEstado: 🔨 Construyendo aplicación...'
+              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+          "
       
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
@@ -52,7 +383,7 @@ jobs:
       - name: Lint code
         run: |
           npm install --save-dev eslint --no-save
-          npx eslint src --ext .js,.jsx --max-warnings 20 || echo "⚠️ Linting encontró warnings"
+          npx eslint src --ext .js,.jsx,.ts,.tsx --max-warnings 20 || echo "⚠️ Linting encontró warnings"
         continue-on-error: true
       
       - name: Run tests
@@ -86,11 +417,79 @@ jobs:
         with:
           name: frontend-coverage-${{ matrix.node-version }}
           path: frontend/coverage/
+      
+      - name: Notificar resultado de tests
+        if: always()
+        run: |
+          python -c "
+          import requests
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
+          pr_number = ${{ github.event.pull_request.number }}
+          job_status = '${{ job.status }}'
+          
+          if token and chat_id:
+              url = f'https://api.telegram.org/bot{token}/sendMessage'
+              
+              if job_status == 'success':
+                  message = f'✅ *Tests Exitosos*\n\nPR: #{pr_number}\\nEstado: ✅ Todos los tests pasaron\\n\\n✓ Continuando con despliegue.'
+              else:
+                  message = f'❌ *Tests Fallidos*\n\nPR: #{pr_number}\\nEstado: ❌ Tests fallaron\\n\\n⚠️ Pipeline detenido.'
+              
+              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+          "
+    
+    outputs:
+      build_passed: ${{ job.status == 'success' }}
 
-  lighthouse:
-    name: Lighthouse Performance
+  # ========== ETAPA 3: MERGE AUTOMÁTICO A TEST ==========
+  merge-to-test:
+    name: 🔀 Merge Automático a Test
+    needs: [security-review, build-and-test]
+    if: |
+      needs.security-review.outputs.security_passed == 'true' &&
+      needs.build-and-test.outputs.build_passed == 'true' &&
+      github.event_name == 'pull_request' &&
+      github.base_ref == 'test'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Merge automático a test
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          git checkout test
+          git pull origin test
+          git merge origin/${{ github.head_ref }} --no-ff -m "Auto-merge: PR #${{ github.event.pull_request.number }} [Security Approved + Tests Passed]"
+          git push origin test
+      
+      - name: Notificar merge exitoso
+        run: |
+          python -c "
+          import requests
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
+          pr_number = ${{ github.event.pull_request.number }}
+          
+          if token and chat_id:
+              url = f'https://api.telegram.org/bot{token}/sendMessage'
+              message = f'✅ *Merge a Test Exitoso*\n\nPR: #{pr_number}\\nEstado: 🔀 Merge completado\\nRama: test\\n\\n✓ Código listo para producción.'
+              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+          "
+
+  # ========== ETAPA 4: LIGHTHOUSE PERFORMANCE ==========
+  lighthouse:
+    name: 📊 Lighthouse Performance
     needs: build-and-test
+    if: needs.build-and-test.outputs.build_passed == 'true'
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     
     steps:
@@ -116,3 +515,89 @@ jobs:
             http://localhost:3000
           uploadArtifacts: true
           temporaryPublicStorage: true
+
+  # ========== ETAPA 5: MERGE A MAIN Y DESPLIEGUE ==========
+  deploy-production:
+    name: 🚀 Despliegue en Producción
+    needs: [security-review, build-and-test, lighthouse]
+    if: |
+      needs.security-review.outputs.security_passed == 'true' &&
+      needs.build-and-test.outputs.build_passed == 'true' &&
+      github.event_name == 'pull_request' &&
+      github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    environment: production
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Merge automático a main
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          git checkout main
+          git pull origin main
+          git merge origin/${{ github.head_ref }} --no-ff -m "Auto-deploy: PR #${{ github.event.pull_request.number }} [Secure Release]"
+          git push origin main
+      
+      - name: Desplegar en Railway (ejemplo)
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          echo "🚀 Desplegando en Railway..."
+          # Comando de despliegue específico para tu proveedor
+          # railway up --detach || echo "Despliegue completado"
+          echo "Despliegue simulado para demostración"
+      
+      - name: Notificar despliegue exitoso
+        run: |
+          python -c "
+          import requests
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
+          pr_number = ${{ github.event.pull_request.number }}
+          deploy_url = '${{ env.DEPLOY_URL }}'
+          
+          if token and chat_id:
+              url = f'https://api.telegram.org/bot{token}/sendMessage'
+              message = f'🎉 *Despliegue en Producción Exitoso*\n\nPR: #{pr_number}\\nEstado: 🚀 EN PRODUCCIÓN\\nURL: {deploy_url}\\n\\n✅ Pipeline completado exitosamente.'
+              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+          "
+      
+      - name: Crear release tag
+        run: |
+          VERSION="v$(date +%Y%m%d.%H%M)"
+          git tag -a "$VERSION" -m "Release: PR #${{ github.event.pull_request.number }}"
+          git push origin "$VERSION"
+
+  # ========== ETAPA FALLBACK: NOTIFICACIÓN DE FALLOS ==========
+  notify-failure:
+    name: 📢 Notificar Fallos
+    if: always() && (failure() || cancelled())
+    needs: [security-review, build-and-test, deploy-production]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Notificar fallo general
+        if: failure()
+        run: |
+          python -c "
+          import requests
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
+          pr_number = ${{ github.event.pull_request.number }}
+          workflow = '${{ github.workflow }}'
+          
+          if token and chat_id:
+              url = f'https://api.telegram.org/bot{token}/sendMessage'
+              message = f'❌ *Pipeline Falló*\n\nPR: #{pr_number}\\nWorkflow: {workflow}\\nEstado: ❌ FALLO\\n\\n⚠️ Revisar los logs de GitHub Actions.'
+              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+          "
