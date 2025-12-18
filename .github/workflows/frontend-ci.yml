@@ -2,7 +2,7 @@ name: Secure DevOps CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop, test ]
+    branches: [ main, dev, test ]
     paths:
       - 'frontend/**'
       - 'backend/**'
