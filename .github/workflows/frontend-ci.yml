@@ -15,7 +15,7 @@ on:
 env:
   TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
   TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-  MODEL_PATH: './models/modelo_seguridad_final.pkl'
+  MODEL_PATH: './models/modelo_seguridad_final2.pkl'
   DEPLOY_URL: 'https://tu-app.railway.app'
 
 jobs:
@@ -54,7 +54,7 @@ jobs:
       - name: Verificar modelo de ML
         run: |
           echo "Verificando modelo de minería de datos..."
-          if [ -f "models/modelo_seguridad_final.pkl" ]; then
+          if [ -f "models/modelo_seguridad_final2.pkl" ]; then
             echo "Modelo ML encontrado"
           else
             echo "Modelo no encontrado, usando modelo por defecto"
@@ -126,7 +126,7 @@ jobs:
           import os
           from pathlib import Path
           
-          MODEL_PATH = os.getenv('MODEL_PATH', 'models/modelo_seguridad_final.pkl')
+          MODEL_PATH = os.getenv('MODEL_PATH', 'models/modelo_seguridad_final2.pkl')
           
           class SecurityScannerML:
               def __init__(self):
