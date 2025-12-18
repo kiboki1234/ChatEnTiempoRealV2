@@ -527,13 +527,90 @@ jobs:
     outputs:
       build_passed: ${{ job.status == 'success' }}
 
+  # ========== ETAPA 2B: VERIFICACIÓN DEL BACKEND ==========
+  backend-verification:
+    name: Backend Verification
+    needs: security-review
+    if: needs.security-review.outputs.security_passed == 'true' && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    defaults:
+      run:
+        working-directory: ./backend
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Notificar inicio de tests backend
+        run: |
+          python -c "
+          import requests
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
+          pr_number = ${{ github.event.pull_request.number }}
+          
+          if token and chat_id:
+              url = f'https://api.telegram.org/bot{token}/sendMessage'
+              message = f'🔙 *Inicio de Tests Backend*\n\nPR: #{pr_number}\\nEstado: 🧪 Ejecutando Jest...'
+              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+          "
+      
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run Backend Tests
+        run: npm test
+        env:
+          NODE_ENV: test
+          MONGODB_URI: mongodb://localhost:27017/test_db
+          JWT_SECRET: test_secret_key
+          ENCRYPTION_KEY: test_encryption_key_32_chars_longgggg
+          
+      - name: Notificar resultado backend
+        if: always()
+        run: |
+          python -c "
+          import requests
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
+          pr_number = ${{ github.event.pull_request.number }}
+          job_status = '${{ job.status }}'
+          
+          if token and chat_id:
+              url = f'https://api.telegram.org/bot{token}/sendMessage'
+              
+              if job_status == 'success':
+                  message = f'✅ *Backend Tests Exitosos*\n\nPR: #{pr_number}\\nEstado: ✅ Todos los tests pasaron'
+              else:
+                  message = f'❌ *Backend Tests Fallidos*\n\nPR: #{pr_number}\\nEstado: ❌ Tests fallaron'
+              
+              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+          "
+
+    outputs:
+      backend_passed: ${{ job.status == 'success' }}
+
   # ========== ETAPA 3: MERGE AUTOMÁTICO A TEST ==========
   merge-to-test:
     name: Merge Automático a Test
-    needs: [security-review, build-and-test]
+    needs: [security-review, build-and-test, backend-verification]
     if: |
       needs.security-review.outputs.security_passed == 'true' &&
       needs.build-and-test.outputs.build_passed == 'true' &&
+      needs.backend-verification.outputs.backend_passed == 'true' &&
       github.event_name == 'pull_request' &&
       github.base_ref == 'test'
     runs-on: ubuntu-latest
@@ -604,10 +681,11 @@ jobs:
   # ========== ETAPA 5: MERGE A MAIN Y DESPLIEGUE ==========
   deploy-production:
     name: Despliegue en Producción
-    needs: [security-review, build-and-test, lighthouse]
+    needs: [security-review, build-and-test, backend-verification, lighthouse]
     if: |
       needs.security-review.outputs.security_passed == 'true' &&
       needs.build-and-test.outputs.build_passed == 'true' &&
+      needs.backend-verification.outputs.backend_passed == 'true' &&
       github.event_name == 'pull_request' &&
       github.base_ref == 'main'
     runs-on: ubuntu-latest
@@ -668,7 +746,7 @@ jobs:
   notify-failure:
     name: Notificar Fallos
     if: always() && (failure() || cancelled())
-    needs: [security-review, build-and-test, deploy-production]
+    needs: [security-review, build-and-test, backend-verification, deploy-production]
     runs-on: ubuntu-latest
     
     steps:
