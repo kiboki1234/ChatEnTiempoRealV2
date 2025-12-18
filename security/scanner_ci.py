@@ -140,7 +140,8 @@ def main():
                 'risk_probability': float(probabilidad),
                 'risk_keywords': features['risk_keywords'],
                 'nloc': features['nloc'],
-                'complexity': features['max_complexity'],
+                'avg_complexity': features['avg_complexity'],
+                'max_complexity': features['max_complexity'],
                 'findings': features['findings'],
                 'patterns': features['found_patterns']
             }

@@ -282,14 +282,20 @@ jobs:
                               name = item.get('file', 'unknown')
                               prob = float(item.get('risk_probability', 0)) * 100
                               nloc = item.get('nloc', 0)
-                              comp = item.get('complexity', 0)
+                              avg_comp = item.get('avg_complexity', 0)
+                              max_comp = item.get('max_complexity', 0)
+                              keywords = item.get('risk_keywords', 0)
                               
                               # Escape special characters for Markdown
                               display_name = name.replace('_', '\\_').replace('*', '\\*')
 
                               message += f'📂 *Archivo {count}:* {display_name}\n'
                               message += f'   ⚠️ Riesgo: {prob:.1f}%\n'
-                              message += f'   📏 Tamaño: {nloc} líneas | 🧠 Complejidad: {comp}\n'
+                              message += f'   📊 *Parámetros del Modelo:*\n'
+                              message += f'   • 📏 Líneas (NLOC): {nloc}\n'
+                              message += f'   • 🧠 Complejidad Promedio: {avg_comp:.1f}\n'
+                              message += f'   • 🤯 Complejidad Máxima: {max_comp}\n'
+                              message += f'   • 🔑 Palabras Clave de Riesgo: {keywords}\n'
                               
                               findings = item.get('findings', [])
                               if findings:
