@@ -782,7 +782,6 @@ jobs:
           uploadArtifacts: true
           temporaryPublicStorage: true
 
-  # ========== ETAPA 5: MERGE A MAIN Y DESPLIEGUE ==========
 
   # ========== ETAPA FALLBACK: NOTIFICACIÓN DE FALLOS ==========
   notify-failure:
