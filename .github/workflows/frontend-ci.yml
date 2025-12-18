@@ -2,13 +2,14 @@ name: Secure DevOps CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop, test ]
+    branches: [ '**' ]
     paths:
       - 'frontend/**'
       - 'backend/**'
       - '.github/workflows/frontend-ci.yml'
+      - 'security/**'
   pull_request:
-    branches: [ test, main, dev ]
+    branches: [ '**' ]
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
