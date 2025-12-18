@@ -329,7 +329,7 @@ jobs:
 
   # ========== ETAPA 2: BUILD Y TEST DEL FRONTEND (SOLO SI SEGURO) ==========
   build-and-test:
-    name: 🏗️ Build & Test Frontend
+    name: Build & Test Frontend
     needs: security-review
     if: needs.security-review.outputs.security_passed == 'true' && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -444,7 +444,7 @@ jobs:
 
   # ========== ETAPA 3: MERGE AUTOMÁTICO A TEST ==========
   merge-to-test:
-    name: 🔀 Merge Automático a Test
+    name: Merge Automático a Test
     needs: [security-review, build-and-test]
     if: |
       needs.security-review.outputs.security_passed == 'true' &&
@@ -486,7 +486,7 @@ jobs:
 
   # ========== ETAPA 4: LIGHTHOUSE PERFORMANCE ==========
   lighthouse:
-    name: 📊 Lighthouse Performance
+    name: Lighthouse Performance
     needs: build-and-test
     if: needs.build-and-test.outputs.build_passed == 'true'
     runs-on: ubuntu-latest
@@ -518,7 +518,7 @@ jobs:
 
   # ========== ETAPA 5: MERGE A MAIN Y DESPLIEGUE ==========
   deploy-production:
-    name: 🚀 Despliegue en Producción
+    name: Despliegue en Producción
     needs: [security-review, build-and-test, lighthouse]
     if: |
       needs.security-review.outputs.security_passed == 'true' &&
@@ -580,7 +580,7 @@ jobs:
 
   # ========== ETAPA FALLBACK: NOTIFICACIÓN DE FALLOS ==========
   notify-failure:
-    name: 📢 Notificar Fallos
+    name: Notificar Fallos
     if: always() && (failure() || cancelled())
     needs: [security-review, build-and-test, deploy-production]
     runs-on: ubuntu-latest
