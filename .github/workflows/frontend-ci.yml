@@ -82,6 +82,8 @@ jobs:
       
       - name: Notificar inicio de revisión de seguridad
         if: always()
+        env:
+          COMMIT_MSG: ${{ github.event_name == 'push' && github.event.head_commit.message || github.event.pull_request.title }}
         run: |
           python -c "
           import requests
@@ -99,12 +101,27 @@ jobs:
               ref_info = 'Push: ${{ github.ref_name }}'
           
           author = '${{ github.actor }}'
+          repo = os.environ.get('GITHUB_REPOSITORY', 'unknown/repo')
+          commit_msg = os.environ.get('COMMIT_MSG', 'No message')
+          
+          from datetime import datetime, timedelta, timezone
+          tz = timezone(timedelta(hours=-5))
+          time_str = datetime.now(tz).strftime('%d/%m/%Y %H:%M')
           
           url = f'https://api.telegram.org/bot{token}/sendMessage'
-          message = f'🔍 *Inicio de Revisión de Seguridad*\n\n{ref_info}\nAutor: {author}\nEstado: ⏳ Analizando código...'
+          
+          text = (
+              f"🔍 *Inicio de Revisión de Seguridad*\n\n"
+              f"📂 *Repo:* `{repo}`\n"
+              f"🌿 *Rama:* `{ref_info}`\n"
+              f"👤 *Autor:* {author}\n"
+              f"📝 *Commit:* _{commit_msg}_\n"
+              f"⏰ *Hora:* {time_str}\n\n"
+              f"⚙️ *Estado:* ⏳ Analizando código..."
+          )
           
           try:
-              resp = requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+              resp = requests.post(url, json={'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'})
               print(f'Telegram response: {resp.status_code} {resp.text}')
               resp.raise_for_status()
           except Exception as e:
@@ -381,14 +398,22 @@ jobs:
       - name: Notificar resultado de seguridad
         id: notify-security
         if: always()
+        env:
+          COMMIT_MSG: ${{ github.event_name == 'push' && github.event.head_commit.message || github.event.pull_request.title }}
         run: |
           python -c "
           import requests
           import json
+          import os
+          from datetime import datetime, timedelta, timezone
           
           token = '${{ env.TELEGRAM_BOT_TOKEN }}'
           chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
           ref_info = 'PR: #${{ github.event.pull_request.number }}' if '${{ github.event_name }}' == 'pull_request' else 'Push: ${{ github.ref_name }}'
+          repo = os.environ.get('GITHUB_REPOSITORY', 'unknown')
+          
+          tz = timezone(timedelta(hours=-5))
+          time_str = datetime.now(tz).strftime('%d/%m/%Y %H:%M')
           
           try:
               with open('security_result.json', 'r') as f:
@@ -412,16 +437,18 @@ jobs:
               
               if status == 'VULNERABLE':
                   message = f'*🚨 VULNERABILIDAD DETECTADA*\n\n'
-                  message += f'{ref_info}\n'
-                  message += f'Estado: ❌ RECHAZADO\n'
-                  message += f'Riesgo máximo: {float(risk_prob)*100:.1f}%\n'
-                  message += f'Archivos vulnerables: {len(vulnerable_files)}\n\n'
+                  message += f'📂 *Repo:* `{repo}`\n'
+                  message += f'🌿 *Ref:* `{ref_info}`\n'
+                  message += f'⏰ *Hora:* {time_str}\n\n'
+                  message += f'❌ *Estado:* RECHAZADO\n'
+                  message += f'⚠️ *Riesgo:* {float(risk_prob)*100:.1f}%\n'
+                  message += f'📂 *Archivos:* {len(vulnerable_files)}\n\n'
                   
                   if vulnerable_files:
                       message += '*Archivos afectados:*\n'
                       for i, file_path in enumerate(vulnerable_files[:5]):
                           filename = file_path.split('/')[-1] if '/' in file_path else file_path
-                          message += f'{i+1}. \`{filename}\`\n'
+                          message += f'{i+1}. `{filename}`\n'
                       
                       if len(vulnerable_files) > 5:
                           message += f'... y {len(vulnerable_files)-5} más\n'
@@ -429,9 +456,11 @@ jobs:
                   message += '\n🔒 *Merge bloqueado*\n🛠️ *Se requiere corrección inmediata*'
               else:
                   message = f'*✅ CÓDIGO SEGURO*\n\n'
-                  message += f'{ref_info}\n'
-                  message += f'Estado: ✅ APROBADO\n'
-                  message += f'Riesgo: {float(risk_prob)*100:.1f}%\n\n'
+                  message += f'📂 *Repo:* `{repo}`\n'
+                  message += f'🌿 *Ref:* `{ref_info}`\n'
+                  message += f'⏰ *Hora:* {time_str}\n\n'
+                  message += f'✅ *Estado:* APROBADO\n'
+                  message += f'🛡️ *Riesgo:* {float(risk_prob)*100:.1f}%\n\n'
                   message += '✓ Continuando con el pipeline CI/CD'
               
               requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
@@ -711,8 +740,8 @@ jobs:
       needs.security-review.outputs.security_passed == 'true' &&
       needs.build-and-test.outputs.build_passed == 'true' &&
       needs.backend-verification.outputs.backend_passed == 'true' &&
-      github.event_name == 'pull_request' &&
-      github.base_ref == 'main'
+      needs.backend-verification.outputs.backend_passed == 'true' &&
+      ((github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
@@ -727,6 +756,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Merge automático a main
+        if: github.event_name == 'pull_request'
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
@@ -747,18 +777,38 @@ jobs:
           echo "Despliegue simulado para demostración"
       
       - name: Notificar despliegue exitoso
+        env:
+          COMMIT_MSG: ${{ github.event.pull_request.title }}
         run: |
           python -c "
           import requests
+          import os
+          from datetime import datetime, timedelta, timezone
+          
           token = '${{ env.TELEGRAM_BOT_TOKEN }}'
           chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          pr_number = '${{ github.event.pull_request.number }}'
+          ref_info = 'PR: #${{ github.event.pull_request.number }}' if '${{ github.event_name }}' == 'pull_request' else 'Push: ${{ github.ref_name }}'
           deploy_url = '${{ env.DEPLOY_URL }}'
+          repo = os.environ.get('GITHUB_REPOSITORY', 'unknown')
+          author = '${{ github.actor }}'
+          
+          tz = timezone(timedelta(hours=-5))
+          time_str = datetime.now(tz).strftime('%d/%m/%Y %H:%M')
           
           if token and chat_id:
               url = f'https://api.telegram.org/bot{token}/sendMessage'
-              message = f'🎉 *Despliegue en Producción Exitoso*\n\nPR: #{pr_number}\\nEstado: 🚀 EN PRODUCCIÓN\\nURL: {deploy_url}\\n\\n✅ Pipeline completado exitosamente.'
-              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+              
+              text = (
+                  f"🎉 *Despliegue en Producción Exitoso*\n\n"
+                  f"📂 *Repo:* `{repo}`\n"
+                  f"🌿 *Ref:* `{ref_info}`\n"
+                  f"👤 *Autor:* {author}\n"
+                  f"🚀 *URL:* {deploy_url}\n"
+                  f"⏰ *Hora:* {time_str}\n\n"
+                  f"✅ Pipeline completado exitosamente."
+              )
+              
+              requests.post(url, json={'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'})
           "
       
       - name: Crear release tag
@@ -777,16 +827,38 @@ jobs:
     steps:
       - name: Notificar fallo general
         if: failure()
+        env:
+          COMMIT_MSG: ${{ github.event_name == 'push' && github.event.head_commit.message || github.event.pull_request.title }}
         run: |
           python -c "
           import requests
+          import os
+          from datetime import datetime, timedelta, timezone
+          
           token = '${{ env.TELEGRAM_BOT_TOKEN }}'
           chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          pr_number = '${{ github.event.pull_request.number }}'
+          ref_info = 'PR: #${{ github.event.pull_request.number }}' if '${{ github.event_name }}' == 'pull_request' else 'Push: ${{ github.ref_name }}'
           workflow = '${{ github.workflow }}'
+          repo = os.environ.get('GITHUB_REPOSITORY', 'unknown')
+          author = '${{ github.actor }}'
+          commit_msg = os.environ.get('COMMIT_MSG', 'No message')
+          
+          tz = timezone(timedelta(hours=-5))
+          time_str = datetime.now(tz).strftime('%d/%m/%Y %H:%M')
           
           if token and chat_id:
               url = f'https://api.telegram.org/bot{token}/sendMessage'
-              message = f'❌ *Pipeline Falló*\n\nPR: #{pr_number}\\nWorkflow: {workflow}\\nEstado: ❌ FALLO\\n\\n⚠️ Revisar los logs de GitHub Actions.'
-              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+              
+              text = (
+                  f"❌ *Pipeline Falló*\n\n"
+                  f"📂 *Repo:* `{repo}`\n"
+                  f"🌿 *Ref:* `{ref_info}`\n"
+                  f"👤 *Autor:* {author}\n"
+                  f"📝 *Commit:* _{commit_msg}_\n"
+                  f"⚙️ *Workflow:* {workflow}\n"
+                  f"⏰ *Hora:* {time_str}\n\n"
+                  f"⚠️ *Estado:* ❌ FALLO CRÍTICO - Revisar GitHub Actions."
+              )
+              
+              requests.post(url, json={'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'})
           "
