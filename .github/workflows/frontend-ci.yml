@@ -282,24 +282,24 @@ jobs:
             
             const comment = `## 🔍 Resultado de Revisión de Seguridad (Modelo de Minería de Datos)
             
-      **Estado:** ${status}
-      **Probabilidad de riesgo máxima:** ${(parseFloat('${{ steps.security-scan.outputs.risk_probability }}') * 100).toFixed(1)}%
-      **Archivos analizados:** ${totalFiles}
-      **Vulnerabilidades detectadas:** ${vulnerabilitiesFound}
+            **Estado:** ${status}
+            **Probabilidad de riesgo máxima:** ${(parseFloat('${{ steps.security-scan.outputs.risk_probability }}') * 100).toFixed(1)}%
+            **Archivos analizados:** ${totalFiles}
+            **Vulnerabilidades detectadas:** ${vulnerabilitiesFound}
 
-      ${isVulnerable ? '## ❌ MERGE BLOQUEADO - Se requiere corrección de vulnerabilidades' : '## ✅ APROBADO - El código es seguro para continuar'}
+            ${isVulnerable ? '## ❌ MERGE BLOQUEADO - Se requiere corrección de vulnerabilidades' : '## ✅ APROBADO - El código es seguro para continuar'}
 
-      ${vulnerableFilesList}
+            ${vulnerableFilesList}
 
-      <details>
-      <summary>📊 Ver todos los resultados del análisis</summary>
+            <details>
+            <summary>📊 Ver todos los resultados del análisis</summary>
 
-      \`\`\`json
-      ${JSON.stringify(vulnerableFiles, null, 2)}
-      \`\`\`
-      </details>
+            \`\`\`json
+            ${JSON.stringify(vulnerableFiles, null, 2)}
+            \`\`\`
+            </details>
 
-      *Modelo de ML: Random Forest | Accuracy: >82%*`;
+            *Modelo de ML: Random Forest | Accuracy: >82%*`;
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
