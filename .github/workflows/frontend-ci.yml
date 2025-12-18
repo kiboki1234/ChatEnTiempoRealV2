@@ -243,44 +243,73 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            let details = 'No se pudo cargar el reporte detallado.';
+            
+            let vulnerableFiles = [];
+            let totalFiles = 0;
+            let vulnerabilitiesFound = 0;
+            
             try {
-              const result = fs.readFileSync('security_result.json', 'utf8');
-              const data = JSON.parse(result);
-              details = JSON.stringify(data.details.slice(0, 5), null, 2);
-            } catch (e) {}
+              const result = JSON.parse(fs.readFileSync('security_result.json', 'utf8'));
+              totalFiles = result.files_analyzed || 0;
+              vulnerabilitiesFound = result.vulnerabilities_found || 0;
+              
+              // Filtrar solo los archivos vulnerables
+              vulnerableFiles = result.details.filter(file => 
+                file.status === 'VULNERABLE'
+              ).map(file => ({
+                path: file.file,
+                probability: (file.risk_probability * 100).toFixed(1) + '%',
+                risk_keywords: file.risk_keywords || 0
+              }));
+              
+            } catch (e) {
+              console.error('Error reading security result:', e);
+            }
             
             const isVulnerable = '${{ steps.security-scan.outputs.is_vulnerable }}' === 'true';
             const status = isVulnerable ? '❌ VULNERABLE' : '✅ SEGURO';
             
+            // Construir lista de archivos vulnerables
+            let vulnerableFilesList = '';
+            if (vulnerableFiles.length > 0) {
+              vulnerableFilesList = '### 📋 Archivos Vulnerables Detectados:\n\n';
+              vulnerableFiles.forEach(file => {
+                vulnerableFilesList += `- **${file.path}**\n`;
+                vulnerableFilesList += `  - Probabilidad de riesgo: ${file.probability}\n`;
+                vulnerableFilesList += `  - Patrones de riesgo detectados: ${file.risk_keywords}\n\n`;
+              });
+            }
+            
             const comment = `## 🔍 Resultado de Revisión de Seguridad (Modelo de Minería de Datos)
             
-            **Estado:** ${status}
-            **Probabilidad de riesgo:** ${(parseFloat('${{ steps.security-scan.outputs.risk_probability }}') * 100).toFixed(1)}%
-            **Archivos analizados:** ${fs.existsSync('security_result.json') ? JSON.parse(fs.readFileSync('security_result.json')).files_analyzed : 'N/A'}
-            **Vulnerabilidades detectadas:** ${fs.existsSync('security_result.json') ? JSON.parse(fs.readFileSync('security_result.json')).vulnerabilities_found : 'N/A'}
-            
-            ${isVulnerable ? '**MERGE BLOQUEADO** - Se requiere corrección de vulnerabilidades.' : '**APROBADO** - El código es seguro para continuar.'}
-            
-            <details>
-            <summary>Ver detalles técnicos</summary>
-            
-            \`\`\`json
-            ${details}
-            \`\`\`
-            </details>
-            
-            *Modelo de ML: Random Forest | Accuracy: >82%*`;
-            
+      **Estado:** ${status}
+      **Probabilidad de riesgo máxima:** ${(parseFloat('${{ steps.security-scan.outputs.risk_probability }}') * 100).toFixed(1)}%
+      **Archivos analizados:** ${totalFiles}
+      **Vulnerabilidades detectadas:** ${vulnerabilitiesFound}
+
+      ${isVulnerable ? '## ❌ MERGE BLOQUEADO - Se requiere corrección de vulnerabilidades' : '## ✅ APROBADO - El código es seguro para continuar'}
+
+      ${vulnerableFilesList}
+
+      <details>
+      <summary>📊 Ver todos los resultados del análisis</summary>
+
+      \`\`\`json
+      ${JSON.stringify(vulnerableFiles, null, 2)}
+      \`\`\`
+      </details>
+
+      *Modelo de ML: Random Forest | Accuracy: >82%*`;
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: comment
             });
-            
+
             // Agregar label según resultado
-            const label = isVulnerable ? 'security-failed' : 'security-approved';
+            const label = isVulnerable ? 'fixing-required' : 'security-approved';
             github.rest.issues.addLabels({
               issue_number: context.issue.number,
               owner: context.repo.owner,
