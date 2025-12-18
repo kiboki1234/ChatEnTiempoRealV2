@@ -628,7 +628,8 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
-          git checkout main
+          git fetch origin
+          git checkout main 2>/dev/null || git checkout -b main origin/main
           git pull origin main
           git merge origin/${{ github.head_ref }} --no-ff -m "Auto-deploy: PR #${{ github.event.pull_request.number }} [Secure Release]"
           git push origin main
