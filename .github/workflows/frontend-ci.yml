@@ -75,8 +75,8 @@ jobs:
         run: |
           python -c "
           import requests
-          token = '${{ secrets.TELEGRAM_BOT_TOKEN }}'
-          chat_id = '${{ secrets.TELEGRAM_CHAT_ID }}'
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
           pr_number = ${{ github.event.pull_request.number }}
           author = '${{ github.event.pull_request.user.login }}'
           
@@ -361,8 +361,8 @@ jobs:
           import requests
           import json
           
-          token = '${{ secrets.TELEGRAM_BOT_TOKEN }}'
-          chat_id = '${{ secrets.TELEGRAM_CHAT_ID }}'
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
           pr_number = ${{ github.event.pull_request.number }}
           
           try:
@@ -441,8 +441,8 @@ jobs:
         run: |
           python -c "
           import requests
-          token = '${{ secrets.TELEGRAM_BOT_TOKEN }}'
-          chat_id = '${{ secrets.TELEGRAM_CHAT_ID }}'
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
           pr_number = ${{ github.event.pull_request.number }}
           
           if token and chat_id:
@@ -508,8 +508,8 @@ jobs:
         run: |
           python -c "
           import requests
-          token = '${{ secrets.TELEGRAM_BOT_TOKEN }}'
-          chat_id = '${{ secrets.TELEGRAM_CHAT_ID }}'
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
           pr_number = ${{ github.event.pull_request.number }}
           job_status = '${{ job.status }}'
           
@@ -559,8 +559,8 @@ jobs:
         run: |
           python -c "
           import requests
-          token = '${{ secrets.TELEGRAM_BOT_TOKEN }}'
-          chat_id = '${{ secrets.TELEGRAM_CHAT_ID }}'
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
           pr_number = ${{ github.event.pull_request.number }}
           
           if token and chat_id:
@@ -647,8 +647,8 @@ jobs:
         run: |
           python -c "
           import requests
-          token = '${{ secrets.TELEGRAM_BOT_TOKEN }}'
-          chat_id = '${{ secrets.TELEGRAM_CHAT_ID }}'
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
           pr_number = ${{ github.event.pull_request.number }}
           deploy_url = '${{ env.DEPLOY_URL }}'
           
@@ -677,8 +677,8 @@ jobs:
         run: |
           python -c "
           import requests
-          token = '${{ secrets.TELEGRAM_BOT_TOKEN }}'
-          chat_id = '${{ secrets.TELEGRAM_CHAT_ID }}'
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
           pr_number = ${{ github.event.pull_request.number }}
           workflow = '${{ github.workflow }}'
           
