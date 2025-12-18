@@ -116,7 +116,7 @@ jobs:
           # si no se pasan argumentos, o podemos intentar pasarlos.
           # El script scanner_ci.py soporta ambos métodos.
           
-          python security/scanner_ci.py "${{ steps.changed-files.outputs.all_changed_files }}"
+          python security/scanner_ci.py
       
       - name: Comentar resultado en el PR
         id: comment-pr

@@ -58,14 +58,24 @@ def extract_features(code, filename):
 
 def main():
     # Recibimos la lista de archivos desde GitHub Actions
-    # Si no hay args, buscamos changed_files.txt (fallback del workflow anterior)
     files_to_scan = sys.argv[1:]
     
-    # Fallback to file reading if no args provided (backward compatibility)
+    # COMPATIBILIDAD: Si se pasó un solo argumento con espacios (ej. "file1.py file2.py"), lo dividimos
+    if len(files_to_scan) == 1 and ' ' in files_to_scan[0]:
+        files_to_scan = files_to_scan[0].split()
+
+    # Fallback: Si no hay args (o venían vacíos), buscamos changed_files.txt
     if not files_to_scan and os.path.exists('changed_files.txt'):
         try:
             with open('changed_files.txt', 'r') as f:
-                files_to_scan = [line.strip() for line in f if line.strip()]
+                # Leer y limpiar: dividir por espacios si es una sola línea, o por líneas
+                content = f.read().strip()
+                if '\n' in content:
+                    files_to_scan = [line.strip() for line in content.split('\n') if line.strip()]
+                elif ' ' in content:
+                    files_to_scan = content.split()
+                elif content:
+                    files_to_scan = [content]
         except: pass
         
     files_to_scan = [f for f in files_to_scan if os.path.exists(f)]
