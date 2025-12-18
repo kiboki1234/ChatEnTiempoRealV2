@@ -2,7 +2,7 @@ name: Secure DevOps CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop, test ]
+    branches: [ main, dev, test ]
     paths:
       - 'frontend/**'
       - 'backend/**'
@@ -289,11 +289,18 @@ jobs:
                   print(f"   - {file}")
           
           sys.exit(1 if vulnerable_count > 0 else 0)
-          EOF
-          
-          echo "${{ steps.changed-files.outputs.all_changed_files }}" > changed_files.txt
+          EOF         
           
           python security_scanner.py
+
+      - name: Guardar lista de archivos modificados
+        run: |
+          if [ -n "${{ steps.changed-files.outputs.all_changed_files }}" ]; then
+            echo "${{ steps.changed-files.outputs.all_changed_files }}" | tr ' ' '\n' > changed_files.txt
+            echo "Archivos modificados guardados en changed_files.txt"
+          else
+            echo "No hay archivos modificados en este PR" > changed_files.txt
+          fi
       
       - name: Comentar resultado en el PR
         id: comment-pr
@@ -813,7 +820,7 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          echo "🚀 Desplegando en Railway..."
+          echo "Desplegando en Railway..."
           # Comando de despliegue específico para tu proveedor
           # railway up --detach || echo "Despliegue completado"
           echo "Despliegue simulado para demostración"
@@ -845,6 +852,7 @@ jobs:
     if: always() && (failure() || cancelled())
     needs: [security-review, build-and-test, backend-verification, deploy-production]
     runs-on: ubuntu-latest
+    
     
     steps:
       - name: Notificar fallo general
