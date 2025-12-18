@@ -5,7 +5,7 @@ import subprocess
 
 def very_unsafe_function(user_input):
     # Intentional vulnerability for testing CI/CD security scan
-    print("Executing very unsafe code... [TRIGGER_FRESH_PUSH]")
+    print("Executing very unsafe code... [TEST_RUN_2]")
     
     # 1. EVAL
     eval(user_input)
