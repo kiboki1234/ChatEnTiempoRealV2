@@ -1,6 +1,5 @@
 name: Secure DevOps CI/CD Pipeline
 
-
 on:
   push:
     branches: [ main, develop, test ]
