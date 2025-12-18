@@ -24,6 +24,10 @@ jobs:
     name: Revisión de Seguridad con ML
     if: github.event_name == 'pull_request' && (github.base_ref == 'test' || github.base_ref == 'main')
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     timeout-minutes: 10
     
     steps:
