@@ -118,3 +118,4 @@ module.exports = {
         TRAILING_DATA_MEDIUM: 5   // Algo de trailing data
     }
 };
+
