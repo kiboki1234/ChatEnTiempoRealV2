@@ -444,25 +444,25 @@ jobs:
                   message += f'Archivos vulnerables: {len(vulnerable_files)}\n\n'
                   
                   if vulnerable_files:
-                      message += '*Detalles de Archivos:*\n'
+                      message += '*📝 DETALLES DE ARCHIVOS:*\n\n'
                       count = 1
                       for item in data.get('details', []):
                           if item.get('status') == 'VULNERABLE':
-                              name = item.get('file', 'unknown').split('/')[-1]
+                              name = item.get('file', 'unknown') # Full path is better for context
+                              prob = float(item.get('risk_probability', 0)) * 100
                               nloc = item.get('nloc', 0)
                               comp = item.get('complexity', 0)
-                              patterns = ', '.join(item.get('patterns', [])) if item.get('patterns') else 'N/A'
+                              patterns = ', '.join(item.get('patterns', [])) if item.get('patterns') else 'Sin patrones específicos'
                               
-                              message += f'{count}. `{name}`\n'
-                              message += f'   📏 Líneas: {nloc} | 🧠 Complejidad: {comp}\n'
-                              if patterns != 'N/A':
-                                  message += f'   ⚠️ Patrones: `{patterns}`\n\n'
-                              else:
-                                  message += '\n'
+                              message += f'📂 *Archivo {count}:* `{name}`\n'
+                              message += f'   ⚠️ Riesgo: {prob:.1f}%\n'
+                              message += f'   📏 Tamaño: {nloc} líneas\n'
+                              message += f'   🧠 Complejidad: {comp}\n'
+                              message += f'   💀 Patrones: `{patterns}`\n\n'
                               count += 1
                       
                       if len(vulnerable_files) > 5:
-                          message += f'... y {len(vulnerable_files)-5} más\n'
+                          message += f'_... y {len(vulnerable_files)-5} archivos más_\n'
                   
                   message += '\n🔒 *Merge bloqueado*\n🛠️ *Se requiere corrección inmediata*'
               else:
