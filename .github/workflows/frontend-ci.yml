@@ -138,172 +138,7 @@ jobs:
           
           MODEL_PATH = os.getenv('MODEL_PATH', 'models/modelo_seguridad_final2.pkl')
           
-          class SecurityScannerML:
-              def __init__(self):
-                  try:
-                      self.model = joblib.load(MODEL_PATH)
-                  except:
-                      self.model = None
-                  
-                  self.RISK_PATTERNS = {
-                      'py': [r'eval\(', r'exec\(', r'subprocess\.', r'os\.system', r'cursor\.execute'],
-                      'js': [r'eval\(', r'innerHTML', r'document\.write', r'dangerouslySetInnerHTML'],
-                      'ts': [r'eval\(', r'innerHTML', r'document\.write', r'dangerouslySetInnerHTML'],
-                      'jsx': [r'dangerouslySetInnerHTML', r'innerHTML'],
-                      'tsx': [r'dangerouslySetInnerHTML', r'innerHTML'],
-                      'java': [r'Statement\s+', r'Runtime\.exec']
-                  }
-              
-              def extract_features(self, code, filename):
-                  features = {'nloc': 0, 'avg_complexity': 0, 'max_complexity': 0, 'risk_keywords': 0, 'findings': []}
-                  
-                  try:
-                      analysis = lizard.analyze_file.analyze_source_code(filename, code)
-                      features['nloc'] = analysis.nloc
-                      features['avg_complexity'] = analysis.average_cyclomatic_complexity
-                      features['max_complexity'] = max([f.cyclomatic_complexity for f in analysis.function_list]) if analysis.function_list else 0
-                  except:
-                      features['nloc'] = len(code.split('\n'))
-                  
-                  ext = filename.split('.')[-1].lower()
-                  lang = 'py' if ext == 'py' else ('js' if ext in ['js', 'jsx'] else ('ts' if ext in ['ts', 'tsx'] else ('java' if ext == 'java' else None)))
-                  
-                  if lang and lang in self.RISK_PATTERNS:
-                      lines = code.split('\n')
-                      for i, line in enumerate(lines):
-                          for pattern in self.RISK_PATTERNS[lang]:
-                              if re.search(pattern, line, re.IGNORECASE):
-                                  features['risk_keywords'] += 1
-                                  clean_pat = pattern.replace('\\', '')
-                                  # Capture the line content stripped of whitespace
-                                  clean_line = line.strip()[:100] # Limit length
-                                  features['findings'].append({
-                                      'line': i + 1,
-                                      'pattern': clean_pat,
-                                      'content': clean_line
-                                  })
-                  
-                  return features
-              
-              def analyze_files(self, files):
-                results = []
-                vulnerable_count = 0
-                
-                for file_path in files:
-                    try:
-                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                            code = f.read()
-                        
-                        features = self.extract_features(code, file_path)
-                        
-                        # Model V2 expects: ['repo', 'sha', 'filename', 'code', 'label', 'nloc', 'avg_complexity', 'max_complexity', 'risk_keywords']
-                        # We must provide these columns. Warning: 'label' in input suggests leakage during training, but we must provide it to match schema.
-                        
-                        data_payload = {
-                            'repo': 'ChatEnTiempoRealV2',
-                            'sha': 'HEAD',
-                            'filename': file_path,
-                            'code': code,
-                            'label': 0, # Dummy value as we are predicting
-                            'nloc': features['nloc'],
-                            'avg_complexity': features['avg_complexity'],
-                            'max_complexity': features['max_complexity'],
-                            'risk_keywords': features['risk_keywords']
-                        }
-                        
-                        if self.model:
-                            df_input = pd.DataFrame([data_payload])
-                            # Ensure column order if necessary, though sklearn usually handles it by name if dataframe
-                            required_cols = ['repo', 'sha', 'filename', 'code', 'label', 'nloc', 'avg_complexity', 'max_complexity', 'risk_keywords']
-                            df_input = df_input[required_cols]
-                            
-                            try:
-                                probability = self.model.predict_proba(df_input)[0][1]
-                                prediction = self.model.predict(df_input)[0]
-                                is_vulnerable = prediction == 1
-                            except Exception as model_err:
-                                print(f"Model prediction error for {file_path}: {model_err}")
-                                # Fallback
-                                probability = features['risk_keywords'] / 10.0
-                                is_vulnerable = features['risk_keywords'] > 2
-                        else:
-                            probability = features['risk_keywords'] / 10.0
-                            is_vulnerable = features['risk_keywords'] > 2
-                        
-                        result = {
-                            'file': file_path,
-                            'status': 'VULNERABLE' if is_vulnerable else 'SECURE',
-                            'risk_probability': float(probability),
-                            'risk_keywords': features['risk_keywords'],
-                            'nloc': features['nloc'],
-                            'complexity': features['max_complexity'],
-                            'findings': features['findings']
-                        }
-                        
-                        results.append(result)
-                        if is_vulnerable:
-                            vulnerable_count += 1
-                            
-                    except Exception as e:
-                        results.append({
-                            'file': file_path,
-                            'status': 'ERROR',
-                            'error': str(e)
-                        })
-                
-                return results, vulnerable_count
-          
-          files_to_scan = []
-          if os.path.exists('changed_files.txt'):
-              with open('changed_files.txt', 'r') as f:
-                  files_to_scan = [line.strip() for line in f if line.strip()]
-          
-          if not files_to_scan:
-              for ext in ['*.py', '*.js', '*.jsx', '*.ts', '*.tsx', '*.java']:
-                  files_to_scan.extend([str(p) for p in Path('.').rglob(ext)])
-          
-          files_to_scan = [f for f in files_to_scan if os.path.exists(f)]
-          
-          scanner = SecurityScannerML()
-          results, vulnerable_count = scanner.analyze_files(files_to_scan[:50])
-          
-          summary = {
-              'status': 'VULNERABLE' if vulnerable_count > 0 else 'SECURE',
-              'risk_probability': max([r.get('risk_probability', 0) for r in results], default=0),
-              'files_analyzed': len(results),
-              'vulnerabilities_found': vulnerable_count,
-              'details': results
-          }
-          
-          with open('security_result.json', 'w') as f:
-              json.dump(summary, f, indent=2)
-          
-          # Guardar outputs usando el nuevo formato
-          vulnerable_files = [r['file'] for r in results if r['status'] == 'VULNERABLE']
-          vulnerable_files_str = ','.join(vulnerable_files) if vulnerable_files else ''
-          
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
-              fh.write(f'is_vulnerable={str(vulnerable_count > 0).lower()}\n')
-              fh.write(f'status={summary["status"]}\n')
-              fh.write(f'risk_probability={summary["risk_probability"]:.2f}\n')
-              fh.write(f'vulnerable_files={vulnerable_files_str}\n')
-          
-          print(f"\nResumen del análisis de seguridad:")
-          print(f"   Archivos analizados: {len(results)}")
-          print(f"   Archivos vulnerables: {vulnerable_count}")
-          print(f"   Estado: {summary['status']}")
-          
-          if vulnerable_files:
-              print(f"\nArchivos vulnerables detectados:")
-              for file in vulnerable_files:
-                  print(f"   - {file}")
-          
-          sys.exit(1 if vulnerable_count > 0 else 0)
-          EOF
-          
-          echo "${{ steps.changed-files.outputs.all_changed_files }}" > changed_files.txt
-          
-          python security_scanner.py
+
       
       - name: Comentar resultado en el PR
         id: comment-pr
@@ -526,14 +361,20 @@ jobs:
                               name = item.get('file', 'unknown')
                               prob = float(item.get('risk_probability', 0)) * 100
                               nloc = item.get('nloc', 0)
-                              comp = item.get('complexity', 0)
+                              avg_comp = item.get('avg_complexity', 0)
+                              max_comp = item.get('max_complexity', 0)
+                              keywords = item.get('risk_keywords', 0)
                               
                               # Escape special characters for Markdown
                               display_name = name.replace('_', '\\_').replace('*', '\\*')
 
                               message += f'📂 *Archivo {count}:* {display_name}\n'
                               message += f'   ⚠️ Riesgo: {prob:.1f}%\n'
-                              message += f'   📏 Tamaño: {nloc} líneas | 🧠 Complejidad: {comp}\n'
+                              message += f'   📊 *Parámetros del Modelo:*\n'
+                              message += f'   • 📏 Líneas (NLOC): {nloc}\n'
+                              message += f'   • 🧠 Complejidad Promedio: {avg_comp:.1f}\n'
+                              message += f'   • 🤯 Complejidad Máxima: {max_comp}\n'
+                              message += f'   • 🔑 Palabras Clave de Riesgo: {keywords}\n'
                               
                               findings = item.get('findings', [])
                               if findings:
