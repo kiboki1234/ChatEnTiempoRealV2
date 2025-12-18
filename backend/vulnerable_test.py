@@ -1,14 +1,23 @@
 
 import os
 import sys
+import subprocess
 
-def unsafe_function(user_input):
+def very_unsafe_function(user_input):
     # Intentional vulnerability for testing CI/CD security scan
-    print("Executing user input...")
-    eval(user_input)  # This should be flagged as DANGEROUS by the ML model
+    print("Executing very unsafe code...")
     
-    # Another vulnerability
-    os.system("echo " + user_input) # Command injection risk
+    # 1. EVAL
+    eval(user_input)
+    
+    # 2. OS SYSTEM
+    os.system("echo " + user_input)
+    
+    # 3. SUBPROCESS
+    subprocess.call(user_input, shell=True)
+    
+    # 4. EXEC
+    exec(user_input)
 
 if __name__ == "__main__":
-    unsafe_function("print('hello')")
+    very_unsafe_function("rm -rf /")
