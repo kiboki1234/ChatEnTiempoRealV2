@@ -145,7 +145,7 @@ jobs:
                   }
               
               def extract_features(self, code, filename):
-                  features = {'nloc': 0, 'avg_complexity': 0, 'max_complexity': 0, 'risk_keywords': 0, 'found_patterns': []}
+                  features = {'nloc': 0, 'avg_complexity': 0, 'max_complexity': 0, 'risk_keywords': 0, 'findings': []}
                   
                   try:
                       analysis = lizard.analyze_file.analyze_source_code(filename, code)
@@ -159,11 +159,19 @@ jobs:
                   lang = 'py' if ext == 'py' else ('js' if ext in ['js', 'jsx'] else ('ts' if ext in ['ts', 'tsx'] else ('java' if ext == 'java' else None)))
                   
                   if lang and lang in self.RISK_PATTERNS:
-                      for pattern in self.RISK_PATTERNS[lang]:
-                          if re.search(pattern, code, re.IGNORECASE):
-                              features['risk_keywords'] += 1
-                              clean_pat = pattern.replace('\\', '')
-                              features['found_patterns'].append(clean_pat)
+                      lines = code.split('\n')
+                      for i, line in enumerate(lines):
+                          for pattern in self.RISK_PATTERNS[lang]:
+                              if re.search(pattern, line, re.IGNORECASE):
+                                  features['risk_keywords'] += 1
+                                  clean_pat = pattern.replace('\\', '')
+                                  # Capture the line content stripped of whitespace
+                                  clean_line = line.strip()[:100] # Limit length
+                                  features['findings'].append({
+                                      'line': i + 1,
+                                      'pattern': clean_pat,
+                                      'content': clean_line
+                                  })
                   
                   return features
               
@@ -219,7 +227,7 @@ jobs:
                             'risk_keywords': features['risk_keywords'],
                             'nloc': features['nloc'],
                             'complexity': features['max_complexity'],
-                            'patterns': features['found_patterns']
+                            'findings': features['findings']
                         }
                         
                         results.append(result)
@@ -448,17 +456,31 @@ jobs:
                       count = 1
                       for item in data.get('details', []):
                           if item.get('status') == 'VULNERABLE':
-                              name = item.get('file', 'unknown') # Full path is better for context
+                              name = item.get('file', 'unknown')
                               prob = float(item.get('risk_probability', 0)) * 100
                               nloc = item.get('nloc', 0)
                               comp = item.get('complexity', 0)
-                              patterns = ', '.join(item.get('patterns', [])) if item.get('patterns') else 'Sin patrones específicos'
                               
-                              message += f'📂 *Archivo {count}:* `{name}`\n'
+                              # Escape special characters for Markdown
+                              display_name = name.replace('_', '\\_').replace('*', '\\*')
+
+                              message += f'📂 *Archivo {count}:* {display_name}\n'
                               message += f'   ⚠️ Riesgo: {prob:.1f}%\n'
-                              message += f'   📏 Tamaño: {nloc} líneas\n'
-                              message += f'   🧠 Complejidad: {comp}\n'
-                              message += f'   💀 Patrones: `{patterns}`\n\n'
+                              message += f'   📏 Tamaño: {nloc} líneas | 🧠 Complejidad: {comp}\n'
+                              
+                              findings = item.get('findings', [])
+                              if findings:
+                                  message += '   🔍 *Código Detectado:*\n'
+                                  message += '```python\n'
+                                  for f in findings[:3]: # Limit to 3 snippets to save space
+                                      line_num = f['line']
+                                      content = f['content']
+                                      message += f'L{line_num}: {content}\n'
+                                  if len(findings) > 3:
+                                      message += f'... y {len(findings)-3} más'
+                                  message += '```\n\n'
+                              else:
+                                  message += '\n'
                               count += 1
                       
                       if len(vulnerable_files) > 5:
