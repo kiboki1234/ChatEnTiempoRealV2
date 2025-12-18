@@ -126,6 +126,7 @@ jobs:
               resp.raise_for_status()
           except Exception as e:
               print(f'Failed to send notification: {e}')
+              sys.exit(1)
           "
       
       - name: Ejecutar escáner de seguridad con ML
@@ -407,8 +408,8 @@ jobs:
           import os
           from datetime import datetime, timedelta, timezone
           
-          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
-          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
+          token = os.environ.get('TELEGRAM_BOT_TOKEN')
+          chat_id = os.environ.get('TELEGRAM_CHAT_ID')
           ref_info = 'PR: #${{ github.event.pull_request.number }}' if '${{ github.event_name }}' == 'pull_request' else 'Push: ${{ github.ref_name }}'
           repo = os.environ.get('GITHUB_REPOSITORY', 'unknown')
           
@@ -463,7 +464,11 @@ jobs:
                   message += f'🛡️ *Riesgo:* {float(risk_prob)*100:.1f}%\n\n'
                   message += '✓ Continuando con el pipeline CI/CD'
               
-              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+              resp = requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+              resp.raise_for_status()
+          except Exception as e:
+              print(f"Error sending telegram message: {e}")
+              sys.exit(1)
           "
     
     outputs:
