@@ -166,48 +166,69 @@ jobs:
                   return features
               
               def analyze_files(self, files):
-                  results = []
-                  vulnerable_count = 0
-                  
-                  for file_path in files:
-                      try:
-                          with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                              code = f.read()
-                          
-                          features = self.extract_features(code, file_path)
-                          
-                          if self.model:
-                              df_input = pd.DataFrame([features])
-                              try:
-                                  probability = self.model.predict_proba(df_input)[0][1]
-                                  prediction = self.model.predict(df_input)[0]
-                                  is_vulnerable = prediction == 1
-                              except:
-                                  probability = features['risk_keywords'] / 10.0
-                                  is_vulnerable = features['risk_keywords'] > 2
-                          else:
-                              probability = features['risk_keywords'] / 10.0
-                              is_vulnerable = features['risk_keywords'] > 2
-                          
-                          result = {
-                              'file': file_path,
-                              'status': 'VULNERABLE' if is_vulnerable else 'SECURE',
-                              'risk_probability': float(probability),
-                              'risk_keywords': features['risk_keywords']
-                          }
-                          
-                          results.append(result)
-                          if is_vulnerable:
-                              vulnerable_count += 1
-                              
-                      except Exception as e:
-                          results.append({
-                              'file': file_path,
-                              'status': 'ERROR',
-                              'error': str(e)
-                          })
-                  
-                  return results, vulnerable_count
+                results = []
+                vulnerable_count = 0
+                
+                for file_path in files:
+                    try:
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            code = f.read()
+                        
+                        features = self.extract_features(code, file_path)
+                        
+                        # Model V2 expects: ['repo', 'sha', 'filename', 'code', 'label', 'nloc', 'avg_complexity', 'max_complexity', 'risk_keywords']
+                        # We must provide these columns. Warning: 'label' in input suggests leakage during training, but we must provide it to match schema.
+                        
+                        data_payload = {
+                            'repo': 'ChatEnTiempoRealV2',
+                            'sha': 'HEAD',
+                            'filename': file_path,
+                            'code': code,
+                            'label': 0, # Dummy value as we are predicting
+                            'nloc': features['nloc'],
+                            'avg_complexity': features['avg_complexity'],
+                            'max_complexity': features['max_complexity'],
+                            'risk_keywords': features['risk_keywords']
+                        }
+                        
+                        if self.model:
+                            df_input = pd.DataFrame([data_payload])
+                            # Ensure column order if necessary, though sklearn usually handles it by name if dataframe
+                            required_cols = ['repo', 'sha', 'filename', 'code', 'label', 'nloc', 'avg_complexity', 'max_complexity', 'risk_keywords']
+                            df_input = df_input[required_cols]
+                            
+                            try:
+                                probability = self.model.predict_proba(df_input)[0][1]
+                                prediction = self.model.predict(df_input)[0]
+                                is_vulnerable = prediction == 1
+                            except Exception as model_err:
+                                print(f"Model prediction error for {file_path}: {model_err}")
+                                # Fallback
+                                probability = features['risk_keywords'] / 10.0
+                                is_vulnerable = features['risk_keywords'] > 2
+                        else:
+                            probability = features['risk_keywords'] / 10.0
+                            is_vulnerable = features['risk_keywords'] > 2
+                        
+                        result = {
+                            'file': file_path,
+                            'status': 'VULNERABLE' if is_vulnerable else 'SECURE',
+                            'risk_probability': float(probability),
+                            'risk_keywords': features['risk_keywords']
+                        }
+                        
+                        results.append(result)
+                        if is_vulnerable:
+                            vulnerable_count += 1
+                            
+                    except Exception as e:
+                        results.append({
+                            'file': file_path,
+                            'status': 'ERROR',
+                            'error': str(e)
+                        })
+                
+                return results, vulnerable_count
           
           files_to_scan = []
           if os.path.exists('changed_files.txt'):
