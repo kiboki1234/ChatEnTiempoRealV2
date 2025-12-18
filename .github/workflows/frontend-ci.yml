@@ -82,10 +82,6 @@ jobs:
       
       - name: Notificar inicio de revisión de seguridad
         if: always()
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          COMMIT_MSG: ${{ github.event_name == 'push' && github.event.head_commit.message || github.event.pull_request.title }}
         run: |
           python -c "
           import requests
@@ -103,36 +99,16 @@ jobs:
               ref_info = 'Push: ${{ github.ref_name }}'
           
           author = '${{ github.actor }}'
-          repo = os.environ.get('GITHUB_REPOSITORY', 'unknown/repo')
-          commit_msg = os.environ.get('COMMIT_MSG', 'No message')
-          
-          from datetime import datetime, timedelta, timezone
-          tz = timezone(timedelta(hours=-5))
-          time_str = datetime.now(tz).strftime('%d/%m/%Y %H:%M')
           
           url = f'https://api.telegram.org/bot{token}/sendMessage'
-          
-          text = (
-              f"🔍 *Inicio de Revisión de Seguridad*\n\n"
-              f"📂 *Repo:* `{repo}`\n"
-              f"🌿 *Rama:* `{ref_info}`\n"
-              f"👤 *Autor:* {author}\n"
-              f"📝 *Commit:* _{commit_msg}_\n"
-              f"⏰ *Hora:* {time_str}\n\n"
-              f"⚙️ *Estado:* ⏳ Analizando código..."
-          )
+          message = f'🔍 *Inicio de Revisión de Seguridad*\n\n{ref_info}\nAutor: {author}\nEstado: ⏳ Analizando código...'
           
           try:
-              resp = requests.post(url, json={'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'})
+              resp = requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
               print(f'Telegram response: {resp.status_code} {resp.text}')
               resp.raise_for_status()
           except Exception as e:
               print(f'Failed to send notification: {e}')
-              sys.exit(1)
-          
-          if not token or not chat_id:
-              print("ERROR: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing from environment.")
-              sys.exit(1)
           "
       
       - name: Ejecutar escáner de seguridad con ML
@@ -405,24 +381,14 @@ jobs:
       - name: Notificar resultado de seguridad
         id: notify-security
         if: always()
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          COMMIT_MSG: ${{ github.event_name == 'push' && github.event.head_commit.message || github.event.pull_request.title }}
         run: |
           python -c "
           import requests
           import json
-          import os
-          from datetime import datetime, timedelta, timezone
           
-          token = os.environ.get('TELEGRAM_BOT_TOKEN')
-          chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
+          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
           ref_info = 'PR: #${{ github.event.pull_request.number }}' if '${{ github.event_name }}' == 'pull_request' else 'Push: ${{ github.ref_name }}'
-          repo = os.environ.get('GITHUB_REPOSITORY', 'unknown')
-          
-          tz = timezone(timedelta(hours=-5))
-          time_str = datetime.now(tz).strftime('%d/%m/%Y %H:%M')
           
           try:
               with open('security_result.json', 'r') as f:
@@ -446,18 +412,16 @@ jobs:
               
               if status == 'VULNERABLE':
                   message = f'*🚨 VULNERABILIDAD DETECTADA*\n\n'
-                  message += f'📂 *Repo:* `{repo}`\n'
-                  message += f'🌿 *Ref:* `{ref_info}`\n'
-                  message += f'⏰ *Hora:* {time_str}\n\n'
-                  message += f'❌ *Estado:* RECHAZADO\n'
-                  message += f'⚠️ *Riesgo:* {float(risk_prob)*100:.1f}%\n'
-                  message += f'📂 *Archivos:* {len(vulnerable_files)}\n\n'
+                  message += f'{ref_info}\n'
+                  message += f'Estado: ❌ RECHAZADO\n'
+                  message += f'Riesgo máximo: {float(risk_prob)*100:.1f}%\n'
+                  message += f'Archivos vulnerables: {len(vulnerable_files)}\n\n'
                   
                   if vulnerable_files:
                       message += '*Archivos afectados:*\n'
                       for i, file_path in enumerate(vulnerable_files[:5]):
                           filename = file_path.split('/')[-1] if '/' in file_path else file_path
-                          message += f'{i+1}. `{filename}`\n'
+                          message += f'{i+1}. \`{filename}\`\n'
                       
                       if len(vulnerable_files) > 5:
                           message += f'... y {len(vulnerable_files)-5} más\n'
@@ -465,22 +429,12 @@ jobs:
                   message += '\n🔒 *Merge bloqueado*\n🛠️ *Se requiere corrección inmediata*'
               else:
                   message = f'*✅ CÓDIGO SEGURO*\n\n'
-                  message += f'📂 *Repo:* `{repo}`\n'
-                  message += f'🌿 *Ref:* `{ref_info}`\n'
-                  message += f'⏰ *Hora:* {time_str}\n\n'
-                  message += f'✅ *Estado:* APROBADO\n'
-                  message += f'🛡️ *Riesgo:* {float(risk_prob)*100:.1f}%\n\n'
+                  message += f'{ref_info}\n'
+                  message += f'Estado: ✅ APROBADO\n'
+                  message += f'Riesgo: {float(risk_prob)*100:.1f}%\n\n'
                   message += '✓ Continuando con el pipeline CI/CD'
               
-              resp = requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
-              resp.raise_for_status()
-          except Exception as e:
-              print(f"Error sending telegram message: {e}")
-              sys.exit(1)
-          
-          if not token or not chat_id:
-              print("ERROR: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing from environment.")
-              sys.exit(1)
+              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
           "
     
     outputs:
@@ -510,17 +464,21 @@ jobs:
       
       - name: Notificar inicio de build
         run: |
-          python -c "
-          import requests
-          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
-          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          ref_info = 'PR: #${{ github.event.pull_request.number }}' if '${{ github.event_name }}' == 'pull_request' else 'Push: ${{ github.ref_name }}'
+          token="${{ env.TELEGRAM_BOT_TOKEN }}"
+          chat_id="${{ env.TELEGRAM_CHAT_ID }}"
           
-          if token and chat_id:
-              url = f'https://api.telegram.org/bot{token}/sendMessage'
-              message = f'🏗️ *Inicio de Build y Tests*\n\n{ref_info}\\nEstado: 🔨 Construyendo aplicación...'
-              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
-          "
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            ref_info="PR: #${{ github.event.pull_request.number }}"
+          else
+            ref_info="Push: ${{ github.ref_name }}"
+          fi
+          
+          message="🏗️ *Inicio de Build y Tests*%0A%0A${ref_info}%0AEstado: 🔨 Construyendo aplicación..."
+          
+          curl -s -X POST "https://api.telegram.org/bot${token}/sendMessage" \
+            -d chat_id="${chat_id}" \
+            -d text="${message}" \
+            -d parse_mode="Markdown"
       
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
@@ -576,27 +534,26 @@ jobs:
       
       - name: Notificar resultado de tests
         if: always()
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python -c "
-          import requests
-          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
-          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          pr_number = ${{ github.event.pull_request.number }}
-          job_status = '${{ job.status }}'
+          token="${{ env.TELEGRAM_BOT_TOKEN }}"
+          chat_id="${{ env.TELEGRAM_CHAT_ID }}"
           
-          if token and chat_id:
-              url = f'https://api.telegram.org/bot{token}/sendMessage'
-              
-              if job_status == 'success':
-                  message = f'✅ *Tests Exitosos*\n\n{ref_info}\\nEstado: ✅ Todos los tests pasaron\\n\\n✓ Continuando.'
-              else:
-                  message = f'❌ *Tests Fallidos*\n\n{ref_info}\\nEstado: ❌ Tests fallaron\\n\\n⚠️ Pipeline detenido.'
-              
-              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
-          "
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            ref_info="PR: #${{ github.event.pull_request.number }}"
+          else
+            ref_info="Push: ${{ github.ref_name }}"
+          fi
+          
+          if [ "${{ job.status }}" == "success" ]; then
+             message="✅ *Tests Exitosos*%0A%0A${ref_info}%0AEstado: ✅ Todos los tests pasaron%0A%0A✓ Continuando."
+          else
+             message="❌ *Tests Fallidos*%0A%0A${ref_info}%0AEstado: ❌ Tests fallaron%0A%0A⚠️ Pipeline detenido."
+          fi
+          
+          curl -s -X POST "https://api.telegram.org/bot${token}/sendMessage" \
+            -d chat_id="${chat_id}" \
+            -d text="${message}" \
+            -d parse_mode="Markdown"
     
     outputs:
       build_passed: ${{ job.status == 'success' }}
@@ -623,17 +580,21 @@ jobs:
       
       - name: Notificar inicio de tests backend
         run: |
-          python -c "
-          import requests
-          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
-          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          ref_info = 'PR: #${{ github.event.pull_request.number }}' if '${{ github.event_name }}' == 'pull_request' else 'Push: ${{ github.ref_name }}'
+          token="${{ env.TELEGRAM_BOT_TOKEN }}"
+          chat_id="${{ env.TELEGRAM_CHAT_ID }}"
           
-          if token and chat_id:
-              url = f'https://api.telegram.org/bot{token}/sendMessage'
-              message = f'🔙 *Inicio de Tests Backend*\n\n{ref_info}\\nEstado: 🧪 Ejecutando Jest...'
-              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
-          "
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            ref_info="PR: #${{ github.event.pull_request.number }}"
+          else
+            ref_info="Push: ${{ github.ref_name }}"
+          fi
+          
+          message="🔙 *Inicio de Tests Backend*%0A%0A${ref_info}%0AEstado: 🧪 Ejecutando Jest..."
+          
+          curl -s -X POST "https://api.telegram.org/bot${token}/sendMessage" \
+            -d chat_id="${chat_id}" \
+            -d text="${message}" \
+            -d parse_mode="Markdown"
       
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
@@ -656,23 +617,25 @@ jobs:
       - name: Notificar resultado backend
         if: always()
         run: |
-          python -c "
-          import requests
-          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
-          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          ref_info = 'PR: #${{ github.event.pull_request.number }}' if '${{ github.event_name }}' == 'pull_request' else 'Push: ${{ github.ref_name }}'
-          job_status = '${{ job.status }}'
+          token="${{ env.TELEGRAM_BOT_TOKEN }}"
+          chat_id="${{ env.TELEGRAM_CHAT_ID }}"
           
-          if token and chat_id:
-              url = f'https://api.telegram.org/bot{token}/sendMessage'
-              
-              if job_status == 'success':
-                  message = f'✅ *Backend Tests Exitosos*\n\n{ref_info}\\nEstado: ✅ Todos los tests pasaron'
-              else:
-                  message = f'❌ *Backend Tests Fallidos*\n\n{ref_info}\\nEstado: ❌ Tests fallaron'
-              
-              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
-          "
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            ref_info="PR: #${{ github.event.pull_request.number }}"
+          else
+            ref_info="Push: ${{ github.ref_name }}"
+          fi
+          
+          if [ "${{ job.status }}" == "success" ]; then
+             message="✅ *Backend Tests Exitosos*%0A%0A${ref_info}%0AEstado: ✅ Todos los tests pasaron"
+          else
+             message="❌ *Backend Tests Fallidos*%0A%0A${ref_info}%0AEstado: ❌ Tests fallaron"
+          fi
+          
+          curl -s -X POST "https://api.telegram.org/bot${token}/sendMessage" \
+            -d chat_id="${chat_id}" \
+            -d text="${message}" \
+            -d parse_mode="Markdown"
 
     outputs:
       backend_passed: ${{ job.status == 'success' }}
@@ -760,8 +723,8 @@ jobs:
       needs.security-review.outputs.security_passed == 'true' &&
       needs.build-and-test.outputs.build_passed == 'true' &&
       needs.backend-verification.outputs.backend_passed == 'true' &&
-      needs.backend-verification.outputs.backend_passed == 'true' &&
-      ((github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+      github.event_name == 'pull_request' &&
+      github.base_ref == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
@@ -776,7 +739,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Merge automático a main
-        if: github.event_name == 'pull_request'
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
@@ -797,40 +759,18 @@ jobs:
           echo "Despliegue simulado para demostración"
       
       - name: Notificar despliegue exitoso
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          COMMIT_MSG: ${{ github.event.pull_request.title }}
         run: |
           python -c "
           import requests
-          import os
-          from datetime import datetime, timedelta, timezone
-          
           token = '${{ env.TELEGRAM_BOT_TOKEN }}'
           chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          ref_info = 'PR: #${{ github.event.pull_request.number }}' if '${{ github.event_name }}' == 'pull_request' else 'Push: ${{ github.ref_name }}'
+          pr_number = '${{ github.event.pull_request.number }}'
           deploy_url = '${{ env.DEPLOY_URL }}'
-          repo = os.environ.get('GITHUB_REPOSITORY', 'unknown')
-          author = '${{ github.actor }}'
-          
-          tz = timezone(timedelta(hours=-5))
-          time_str = datetime.now(tz).strftime('%d/%m/%Y %H:%M')
           
           if token and chat_id:
               url = f'https://api.telegram.org/bot{token}/sendMessage'
-              
-              text = (
-                  f"🎉 *Despliegue en Producción Exitoso*\n\n"
-                  f"📂 *Repo:* `{repo}`\n"
-                  f"🌿 *Ref:* `{ref_info}`\n"
-                  f"👤 *Autor:* {author}\n"
-                  f"🚀 *URL:* {deploy_url}\n"
-                  f"⏰ *Hora:* {time_str}\n\n"
-                  f"✅ Pipeline completado exitosamente."
-              )
-              
-              requests.post(url, json={'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'})
+              message = f'🎉 *Despliegue en Producción Exitoso*\n\nPR: #{pr_number}\\nEstado: 🚀 EN PRODUCCIÓN\\nURL: {deploy_url}\\n\\n✅ Pipeline completado exitosamente.'
+              requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
           "
       
       - name: Crear release tag
@@ -849,40 +789,19 @@ jobs:
     steps:
       - name: Notificar fallo general
         if: failure()
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          COMMIT_MSG: ${{ github.event_name == 'push' && github.event.head_commit.message || github.event.pull_request.title }}
         run: |
-          python -c "
-          import requests
-          import os
-          from datetime import datetime, timedelta, timezone
+          token="${{ env.TELEGRAM_BOT_TOKEN }}"
+          chat_id="${{ env.TELEGRAM_CHAT_ID }}"
           
-          token = '${{ env.TELEGRAM_BOT_TOKEN }}'
-          chat_id = '${{ env.TELEGRAM_CHAT_ID }}'
-          ref_info = 'PR: #${{ github.event.pull_request.number }}' if '${{ github.event_name }}' == 'pull_request' else 'Push: ${{ github.ref_name }}'
-          workflow = '${{ github.workflow }}'
-          repo = os.environ.get('GITHUB_REPOSITORY', 'unknown')
-          author = '${{ github.actor }}'
-          commit_msg = os.environ.get('COMMIT_MSG', 'No message')
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            ref_info="PR: #${{ github.event.pull_request.number }}"
+          else
+            ref_info="Push: ${{ github.ref_name }}"
+          fi
           
-          tz = timezone(timedelta(hours=-5))
-          time_str = datetime.now(tz).strftime('%d/%m/%Y %H:%M')
+          message="❌ *Pipeline Falló*%0A%0A${ref_info}%0AWorkflow: ${{ github.workflow }}%0AEstado: ❌ FALLO%0A%0A⚠️ Revisar los logs de GitHub Actions."
           
-          if token and chat_id:
-              url = f'https://api.telegram.org/bot{token}/sendMessage'
-              
-              text = (
-                  f"❌ *Pipeline Falló*\n\n"
-                  f"📂 *Repo:* `{repo}`\n"
-                  f"🌿 *Ref:* `{ref_info}`\n"
-                  f"👤 *Autor:* {author}\n"
-                  f"📝 *Commit:* _{commit_msg}_\n"
-                  f"⚙️ *Workflow:* {workflow}\n"
-                  f"⏰ *Hora:* {time_str}\n\n"
-                  f"⚠️ *Estado:* ❌ FALLO CRÍTICO - Revisar GitHub Actions."
-              )
-              
-              requests.post(url, json={'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'})
-          "
+          curl -s -X POST "https://api.telegram.org/bot${token}/sendMessage" \
+            -d chat_id="${chat_id}" \
+            -d text="${message}" \
+            -d parse_mode="Markdown"
